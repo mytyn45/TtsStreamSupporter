@@ -123,6 +123,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         private EventSubWebsocketClient websocketClient = new EventSubWebsocketClient();
         private bool _isTtsForChannelPointsEnabled;
         private CancellationTokenSource _clearCts = new();
+        private bool _autoSaveEnabled;
 
         public MainViewModel
             (ITwitchGetID twitchGetId, 
@@ -163,6 +164,9 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             BlackListMembers = _blackListServices.BlackList;
             WordToReplace = _wordReplaceService.WordToReplace;
             WordWhatToReplaceWith = _wordReplaceService.WordWhatToReplaceWith;
+            BlackListMembers.CollectionChanged += (_, __) => SaveSettingsIfEnabled();
+            WordToReplace.CollectionChanged += (_, __) => SaveSettingsIfEnabled();
+            WordWhatToReplaceWith.CollectionChanged += (_, __) => SaveSettingsIfEnabled();
             AvailableVoices = new ObservableCollection<string>();
             AvailableProfiles = new ObservableCollection<string>();
             IndividualVoicesWin = new IndividualVoicesWindow();
@@ -248,6 +252,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 if (message != null)
                     _ttsService.Speak(message);
             };
+
+            _autoSaveEnabled = true;
         }
 
         private async void InstallPiperVoices(string piperVoiceName)
@@ -1154,6 +1160,15 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            SaveSettingsIfEnabled();
+        }
+
+        private void SaveSettingsIfEnabled()
+        {
+            if (_autoSaveEnabled)
+            {
+                SaveSettings();
+            }
         }
     }
 
