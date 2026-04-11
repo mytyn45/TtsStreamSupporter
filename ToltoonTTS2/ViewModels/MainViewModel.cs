@@ -119,6 +119,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         private readonly IWordreplace _wordReplaceService;
         private readonly ITtsMessageProcessing _messageProcessing;
         private string _voiceTestErrorMessage = string.Empty;
+        private double _piperLoadProgress;
+        private string _piperLoadStatus = "Piper: ожидание";
         private WebsocketHostedService _websocketService = new WebsocketHostedService();
         private EventSubWebsocketClient websocketClient = new EventSubWebsocketClient();
         private bool _isTtsForChannelPointsEnabled;
@@ -260,11 +262,14 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         {
             if (!string.IsNullOrEmpty(piperVoiceName))
             {
+                PiperLoadStatus = $"Piper: загрузка голоса {piperVoiceName}";
+                PiperLoadProgress = 10;
                 VoicePiperDownload = "Голос качается...";
                 //скачивать голос, добавлять в список скачанных голосов и индив. голосов.
                 bool DownloadSuccsess = await PiperSharpTTS.DownloadPiper(piperVoiceName);
                 if (DownloadSuccsess)
                 {
+                    PiperLoadProgress = 85;
                     AvailableVoices.Add(piperVoiceName);
                     ItemSourceAllVoices.Add(new PlaceVoicesInfoInWPF
                     {
@@ -277,6 +282,22 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                     });
                     ListBoxPiperVoiceInstalledVoices.Add(piperVoiceName);
                     VoicePiperDownload = "Готово";
+                    PiperLoadProgress = 100;
+                    PiperLoadStatus = $"Piper: голос {piperVoiceName} загружен";
+                }
+                else
+                {
+                    var voiceDir = Path.Combine(Environment.CurrentDirectory, "models", piperVoiceName);
+                    if (Directory.Exists(voiceDir))
+                    {
+                        PiperLoadProgress = 100;
+                        PiperLoadStatus = $"Piper: голос {piperVoiceName} уже установлен";
+                    }
+                    else
+                    {
+                        PiperLoadProgress = 0;
+                        PiperLoadStatus = "Piper: ошибка загрузки голоса";
+                    }
                 }
             }
         }
@@ -393,9 +414,12 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
 
         public async Task InitializeAsync()
         {
+            PiperLoadStatus = "Piper: создание папок";
+            PiperLoadProgress = 10;
             await _directoryService.EnsureAppStructureExists();
+            PiperLoadProgress = 25;
 
-            LoadSettings();
+            await LoadSettings();
         }
 
         public TwitchConnectionState TwitchConnectionState
@@ -874,6 +898,26 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             }
         }
 
+        public double PiperLoadProgress
+        {
+            get => _piperLoadProgress;
+            set
+            {
+                _piperLoadProgress = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string PiperLoadStatus
+        {
+            get => _piperLoadStatus;
+            set
+            {
+                _piperLoadStatus = value;
+                OnPropertyChanged();
+            }
+        }
+
         public string VoicePiperDownload
         {
             get => _voicePiperDownload;
@@ -902,8 +946,10 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             // Логика отключения от Twitch
         }
 
-        private async void LoadSettings()
+        private async Task LoadSettings()
         {
+            PiperLoadStatus = "Piper: загрузка настроек";
+            PiperLoadProgress = 35;
             var settings = _serviceSettings.LoadSettings();
 
             TwitchApi = settings.TwitchApi;
@@ -947,6 +993,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             {
                 _wordToReplaceWith.Add(item);
             }
+            PiperLoadStatus = "Piper: проверка движка и списка голосов";
+            PiperLoadProgress = 55;
             await PiperVoicesData.EnsureFileExists();
 
             string modelsPath = Path.Combine(Environment.CurrentDirectory, "models");
@@ -968,6 +1016,9 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                     ListBoxPiperVoiceInstalledVoices.Add(Path.GetFileName(dir));
                 }
             }
+
+            PiperLoadProgress = 100;
+            PiperLoadStatus = "Piper: готов";
         }
         private void LoadInstalledVoices()
         {
