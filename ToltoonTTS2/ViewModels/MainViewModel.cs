@@ -123,6 +123,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         private EventSubWebsocketClient websocketClient = new EventSubWebsocketClient();
         private bool _isTtsForChannelPointsEnabled;
         private CancellationTokenSource _clearCts = new();
+        private bool _autoSaveEnabled;
 
         public MainViewModel
             (ITwitchGetID twitchGetId, 
@@ -163,6 +164,9 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             BlackListMembers = _blackListServices.BlackList;
             WordToReplace = _wordReplaceService.WordToReplace;
             WordWhatToReplaceWith = _wordReplaceService.WordWhatToReplaceWith;
+            BlackListMembers.CollectionChanged += (_, __) => SaveSettingsIfEnabled();
+            WordToReplace.CollectionChanged += (_, __) => SaveSettingsIfEnabled();
+            WordWhatToReplaceWith.CollectionChanged += (_, __) => SaveSettingsIfEnabled();
             AvailableVoices = new ObservableCollection<string>();
             AvailableProfiles = new ObservableCollection<string>();
             IndividualVoicesWin = new IndividualVoicesWindow();
@@ -248,6 +252,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 if (message != null)
                     _ttsService.Speak(message);
             };
+
+            _autoSaveEnabled = true;
         }
 
         private async void InstallPiperVoices(string piperVoiceName)
@@ -1154,6 +1160,33 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            AutoSaveSettings(propertyName);
+        }
+
+        private void AutoSaveSettings(string propertyName)
+        {
+            if (!_autoSaveEnabled)
+                return;
+
+            if (propertyName is nameof(TwitchApi) or nameof(TwitchClientId) or nameof(TwitchNickname)
+                or nameof(ConnectToTwitch) or nameof(GoodgameNickname) or nameof(ConnectToGoodgame)
+                or nameof(RemoveEmoji) or nameof(SelectedVoice) or nameof(TtsSpeedValue)
+                or nameof(TtsVolumeValue) or nameof(DoNotTtsIfStartWith) or nameof(SkipMessage)
+                or nameof(SkipMessageAll) or nameof(BlackListMembers) or nameof(WordToReplace)
+                or nameof(WordWhatToReplaceWith) or nameof(IndividualVoicesEnabled)
+                or nameof(TtsForChannelPoints) or nameof(NameOfRewardTtsForChannelPoints)
+                or nameof(VkLogin) or nameof(VkAppId) or nameof(VkSecretApi) or nameof(ConnectToVk))
+            {
+                SaveSettings();
+            }
+        }
+
+        private void SaveSettingsIfEnabled()
+        {
+            if (_autoSaveEnabled)
+            {
+                SaveSettings();
+            }
         }
     }
 
