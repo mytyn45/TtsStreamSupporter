@@ -48,15 +48,6 @@ namespace ToltoonTTS2
 
         }
 
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            if (DataContext is MainViewModel viewModel)
-            {
-                viewModel.SaveSettings();
-            }
-            Application.Current.Shutdown();
-        }
-
         private void ListBoxWhatToReplace_SourceUpdated(object sender, System.Windows.Data.DataTransferEventArgs e)
         {
 
