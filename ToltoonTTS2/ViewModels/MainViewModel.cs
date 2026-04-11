@@ -1160,7 +1160,25 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            SaveSettingsIfEnabled();
+            AutoSaveSettings(propertyName);
+        }
+
+        private void AutoSaveSettings(string propertyName)
+        {
+            if (!_autoSaveEnabled)
+                return;
+
+            if (propertyName is nameof(TwitchApi) or nameof(TwitchClientId) or nameof(TwitchNickname)
+                or nameof(ConnectToTwitch) or nameof(GoodgameNickname) or nameof(ConnectToGoodgame)
+                or nameof(RemoveEmoji) or nameof(SelectedVoice) or nameof(TtsSpeedValue)
+                or nameof(TtsVolumeValue) or nameof(DoNotTtsIfStartWith) or nameof(SkipMessage)
+                or nameof(SkipMessageAll) or nameof(BlackListMembers) or nameof(WordToReplace)
+                or nameof(WordWhatToReplaceWith) or nameof(IndividualVoicesEnabled)
+                or nameof(TtsForChannelPoints) or nameof(NameOfRewardTtsForChannelPoints)
+                or nameof(VkLogin) or nameof(VkAppId) or nameof(VkSecretApi) or nameof(ConnectToVk))
+            {
+                SaveSettings();
+            }
         }
 
         private void SaveSettingsIfEnabled()
