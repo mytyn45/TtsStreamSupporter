@@ -949,13 +949,24 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             }
             await PiperVoicesData.EnsureFileExists();
 
-            foreach (var item in File.ReadAllLines("models/PiperVoices.txt"))
+            string modelsPath = Path.Combine(Environment.CurrentDirectory, "models");
+            string voicesFilePath = Path.Combine(modelsPath, "PiperVoices.txt");
+
+            if (File.Exists(voicesFilePath))
             {
-                InstalledPiperVoice.Add(item);
+                foreach (var item in File.ReadAllLines(voicesFilePath))
+                {
+                    if (!string.IsNullOrWhiteSpace(item))
+                        InstalledPiperVoice.Add(item);
+                }
             }
-            foreach(string dir in Directory.GetDirectories("models"))
+
+            if (Directory.Exists(modelsPath))
             {
-                ListBoxPiperVoiceInstalledVoices.Add(dir.Replace("models\\", ""));
+                foreach (string dir in Directory.GetDirectories(modelsPath))
+                {
+                    ListBoxPiperVoiceInstalledVoices.Add(Path.GetFileName(dir));
+                }
             }
         }
         private void LoadInstalledVoices()
