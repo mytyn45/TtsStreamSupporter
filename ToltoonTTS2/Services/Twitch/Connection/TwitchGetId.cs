@@ -1,0 +1,33 @@
+﻿using System.Net.Http.Headers;
+using System.Net.Http;
+
+namespace ToltoonTTS2.Services.Twitch.Connection
+{
+    class TwitchGetId : ITwitchGetID
+    {
+        private string _userId;
+        //получение ID twitch. нужно для получения всех функций чата
+        public async Task<string> GetTwitchUserId(string TwitchApi, string TwitchClientId, string TwitchNickname)
+        {
+            HttpClient ClientToGetId = new HttpClient();
+            ClientToGetId.DefaultRequestHeaders.Clear();
+            ClientToGetId.DefaultRequestHeaders.Add("Client-ID", TwitchClientId);
+            ClientToGetId.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TwitchApi);
+
+            string url = $"https://api.twitch.tv/helix/users?login={TwitchNickname}";
+            HttpResponseMessage response = await ClientToGetId.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            string responseBody = await response.Content.ReadAsStringAsync();
+            dynamic data = Newtonsoft.Json.JsonConvert.DeserializeObject(responseBody);
+            if (data?.data?[0]?.id != null)
+            {
+            _userId = data?.data?[0]?.id;
+            }
+            else throw new Exception("Перепроверь ACCESS TOKEN и CLIENT ID");
+            return _userId;
+        }
+    }
+}

@@ -1,0 +1,49 @@
+﻿using System.IO;
+
+namespace ToltoonTTS2.Services.EnsureFolderAndFileExist
+{
+    public class DirectoryService : IDirectoryService
+    {
+        private string DefaultJsonContent = "[]";
+        string cwd = Environment.CurrentDirectory;
+        public Task EnsureAppStructureExists()
+        {
+            // Проверка и создание папок
+            CreateFolder("DataForProgram", "DataForProgram");
+            CreateFolder("BlackList", "DataForProgram/BlackList");
+            CreateFolder("Profiles", "DataForProgram/Profiles");
+            CreateFolder("WordReplace", "DataForProgram/WordReplace");
+            CreateFolder("Voices", "DataForProgram/Voices");
+            CreateFolder("SoundEffects", "DataForProgram/SoundEffects");
+            CreateFolder("models", cwd);
+            CreateFolder("piper", cwd);
+
+            // Проверка и создание файлов с дефолтным содержимым
+            CreateFile("BlackListUsers.json", "DataForProgram/BlackList");
+            CreateFile("WhatToReplace.json", "DataForProgram/WordReplace");
+            CreateFile("WhatToReplaceWith.json", "DataForProgram/WordReplace");
+
+            return Task.CompletedTask;
+        }
+
+
+        public void CreateFolder(string folderName, string basePath)
+        {
+            var fullPath = Path.Combine(basePath, folderName);
+
+            if (!Directory.Exists(fullPath))
+            {
+                Directory.CreateDirectory(fullPath);
+            }
+        }
+
+        public void CreateFile(string fileName, string folderPath)
+        {
+            string fullPath = Path.Combine(folderPath, fileName); // Объединяем путь к папке и имя файла
+            if (!File.Exists(fullPath))
+            {
+                File.WriteAllText(fullPath, DefaultJsonContent);
+            }
+        }
+    }
+}
