@@ -59,10 +59,19 @@ namespace ToltoonTTS2.Services.TTS
             // Асинхронная подготовка сообщения
             Task.Run(async () =>
             {
-                var ready = await PrepareMessageAsync(msg);
-                _audioQueue.Enqueue(ready);
+                try
+                {
+                    var ready = await PrepareMessageAsync(msg);
+                    if (ready?.Wav == null || ready.Wav.Length == 0)
+                        return;
 
-                StartPlayback();
+                    _audioQueue.Enqueue(ready);
+                    StartPlayback();
+                }
+                catch
+                {
+                    // Проглатываем ошибку подготовки сообщения, чтобы не ронять поток озвучки.
+                }
             });
         }
 
@@ -146,7 +155,17 @@ namespace ToltoonTTS2.Services.TTS
                 return;
             }
 
-            var reader = new WaveFileReader(ready.Wav);
+            WaveFileReader reader;
+            try
+            {
+                reader = new WaveFileReader(ready.Wav);
+            }
+            catch
+            {
+                ready.Wav?.Dispose();
+                PlayNext();
+                return;
+            }
 
             // 1. Создаём провайдер для анализа
             var analysisProvider = reader.ToSampleProvider();
