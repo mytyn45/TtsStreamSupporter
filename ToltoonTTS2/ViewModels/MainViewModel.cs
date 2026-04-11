@@ -1000,8 +1000,6 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             string modelsPath = Path.Combine(Environment.CurrentDirectory, "models");
             string voicesFilePath = Path.Combine(modelsPath, "PiperVoices.txt");
 
-            PiperLoadStatus = "Piper: чтение доступных голосов";
-            PiperLoadProgress = 75;
             if (File.Exists(voicesFilePath))
             {
                 foreach (var item in File.ReadAllLines(voicesFilePath))
