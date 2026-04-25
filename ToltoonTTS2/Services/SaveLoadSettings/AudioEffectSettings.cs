@@ -6,6 +6,7 @@
         public EffectSetting Robot { get; set; } = new();
         public EffectSetting Delay { get; set; } = new();
         public EffectSetting Distortion { get; set; } = new();
+        public EffectSetting Normalization { get; set; } = new();
     }
 
     public class EffectSetting

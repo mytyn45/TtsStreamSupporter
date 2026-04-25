@@ -133,6 +133,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         private int _robotEffectStrength = 50;
         private int _robotEffectChance;
         private bool _delayEffectEnabled;
+        private bool _normalizationEffectEnabled;
         private int _delayEffectStrength = 50;
         private int _delayEffectChance;
         private bool _distortionEffectEnabled;
@@ -937,6 +938,17 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             }
         }
 
+        public bool NormalizarionEffectEnabled
+        {
+            get => _normalizationEffectEnabled;
+            set
+            {
+                OnPropertyChanged();
+                ApplyAudioEffectSettings();
+                _normalizationEffectEnabled = value;
+            }
+        }
+
         public int DelayEffectStrength
         {
             get => _delayEffectStrength;
@@ -987,6 +999,17 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             set
             {
                 _distortionEffectChance = Math.Clamp(value, 0, 100);
+                OnPropertyChanged();
+                ApplyAudioEffectSettings();
+            }
+        }
+
+        public bool NormalizationEffectEnabled
+        {
+            get => _normalizationEffectEnabled;
+            set
+            {
+                _normalizationEffectEnabled = value;
                 OnPropertyChanged();
                 ApplyAudioEffectSettings();
             }
@@ -1479,7 +1502,14 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                     Enabled = DistortionEffectEnabled,
                     Strength = DistortionEffectStrength,
                     Chance = DistortionEffectChance
+                },
+                Normalization = new EffectSetting
+                {
+
+                    Enabled = NormalizationEffectEnabled
                 }
+
+
             });
         }
 

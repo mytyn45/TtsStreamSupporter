@@ -408,7 +408,13 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8">
+                                <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8" Width="120" HorizontalAlignment="left">
+                                    <StackPanel>
+                                        <CheckBox Content="Нормализация" IsChecked="{Binding DelayEffectEnabled, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Border>
+                                
+                                <!--<Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8">
                                     <StackPanel>
                                         <CheckBox Content="Эхо/Delay" IsChecked="{Binding DelayEffectEnabled, UpdateSourceTrigger=PropertyChanged}"/>
                                         <StackPanel Orientation="Horizontal">
@@ -422,7 +428,7 @@
                                             <TextBlock Text="{Binding DelayEffectChance}" Margin="10,0,0,0"/>
                                         </StackPanel>
                                     </StackPanel>
-                                </Border>
+                                </Border>-->
 
                                 <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8">
                                     <StackPanel>
