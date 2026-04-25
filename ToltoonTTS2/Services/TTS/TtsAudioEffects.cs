@@ -110,11 +110,13 @@ class RobotSampleProvider : ISampleProvider
     private readonly ISampleProvider source;
     private double phase;
     private readonly float freq;
+    private readonly float mix;
 
-    public RobotSampleProvider(ISampleProvider source, float frequency = 30f)
+    public RobotSampleProvider(ISampleProvider source, float frequency = 30f, float mix = 1f)
     {
         this.source = source;
         this.freq = frequency;
+        this.mix = Math.Clamp(mix, 0f, 1f);
     }
 
     public WaveFormat WaveFormat => source.WaveFormat;
@@ -127,7 +129,9 @@ class RobotSampleProvider : ISampleProvider
         for (int i = 0; i < read; i++)
         {
             float mod = (float)Math.Sin(phase);
-            buffer[offset + i] *= mod;
+            float dry = buffer[offset + i];
+            float wet = dry * mod;
+            buffer[offset + i] = dry * (1f - mix) + wet * mix;
 
             phase += 2 * Math.PI * freq / sampleRate;
         }
@@ -142,11 +146,13 @@ class DelaySampleProvider : ISampleProvider
     private readonly float[] buffer;
     private int position;
     private readonly float feedback;
+    private readonly float mix;
 
-    public DelaySampleProvider(ISampleProvider source, int delayMs, float feedback = 0.4f)
+    public DelaySampleProvider(ISampleProvider source, int delayMs, float feedback = 0.4f, float mix = 0.4f)
     {
         this.source = source;
-        this.feedback = feedback;
+        this.feedback = Math.Clamp(feedback, 0f, 0.95f);
+        this.mix = Math.Clamp(mix, 0f, 1f);
 
         int samples = source.WaveFormat.SampleRate * delayMs / 1000 * source.WaveFormat.Channels;
         buffer = new float[samples];
@@ -163,7 +169,7 @@ class DelaySampleProvider : ISampleProvider
             float delayed = buffer[position];
             float input = dest[offset + n];
 
-            dest[offset + n] = input + delayed;
+            dest[offset + n] = input * (1f - mix) + (input + delayed) * mix;
             buffer[position] = input + delayed * feedback;
 
             position++;
@@ -178,11 +184,13 @@ class DistortionSampleProvider : ISampleProvider
 {
     private readonly ISampleProvider source;
     private readonly float gain;
+    private readonly float mix;
 
-    public DistortionSampleProvider(ISampleProvider source, float gain = 5f)
+    public DistortionSampleProvider(ISampleProvider source, float gain = 5f, float mix = 1f)
     {
         this.source = source;
         this.gain = gain;
+        this.mix = Math.Clamp(mix, 0f, 1f);
     }
 
     public WaveFormat WaveFormat => source.WaveFormat;
@@ -193,8 +201,10 @@ class DistortionSampleProvider : ISampleProvider
 
         for (int i = 0; i < read; i++)
         {
-            float sample = buffer[offset + i] * gain;
-            buffer[offset + i] = MathF.Tanh(sample);
+            float dry = buffer[offset + i];
+            float sample = dry * gain;
+            float wet = MathF.Tanh(sample);
+            buffer[offset + i] = dry * (1f - mix) + wet * mix;
         }
 
         return read;

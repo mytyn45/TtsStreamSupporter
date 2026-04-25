@@ -371,8 +371,78 @@
                         </StackPanel>
                     </StackPanel>
                 </TabItem>
+                    <TabItem Header="Звуковые эффекты">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10">
+                                <Label Content="Эффекты не накладываются: за одно сообщение применяется только один эффект."/>
 
-                <TabItem x:Name="TabItemAdditionalFunction" 
+                                <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8">
+                                    <StackPanel>
+                                        <CheckBox Content="Вибрато" IsChecked="{Binding VibratoEffectEnabled, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Label Content="Сила" Width="70"/>
+                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding VibratoEffectStrength, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBlock Text="{Binding VibratoEffectStrength}" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Label Content="Шанс, %" Width="70"/>
+                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding VibratoEffectChance, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBlock Text="{Binding VibratoEffectChance}" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8">
+                                    <StackPanel>
+                                        <CheckBox Content="Робот" IsChecked="{Binding RobotEffectEnabled, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Label Content="Сила" Width="70"/>
+                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding RobotEffectStrength, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBlock Text="{Binding RobotEffectStrength}" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Label Content="Шанс, %" Width="70"/>
+                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding RobotEffectChance, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBlock Text="{Binding RobotEffectChance}" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8">
+                                    <StackPanel>
+                                        <CheckBox Content="Эхо/Delay" IsChecked="{Binding DelayEffectEnabled, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Label Content="Сила" Width="70"/>
+                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding DelayEffectStrength, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBlock Text="{Binding DelayEffectStrength}" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Label Content="Шанс, %" Width="70"/>
+                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding DelayEffectChance, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBlock Text="{Binding DelayEffectChance}" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8">
+                                    <StackPanel>
+                                        <CheckBox Content="Дисторшн" IsChecked="{Binding DistortionEffectEnabled, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Label Content="Сила" Width="70"/>
+                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding DistortionEffectStrength, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBlock Text="{Binding DistortionEffectStrength}" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Label Content="Шанс, %" Width="70"/>
+                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding DistortionEffectChance, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBlock Text="{Binding DistortionEffectChance}" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem x:Name="TabItemAdditionalFunction" 
                          Header="Разное">
                     <TabItem.Style>
                         <Style TargetType="TabItem">
