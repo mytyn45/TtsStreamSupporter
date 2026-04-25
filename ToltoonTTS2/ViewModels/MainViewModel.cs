@@ -298,8 +298,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                     ItemSourceAllVoices.Add(new PlaceVoicesInfoInWPF
                     {
                         Name = piperVoiceName,
-                        TextBoxVolume = "100",
-                        TextBoxSpeed = "5",
+                        TextBoxVolume = "50",
+                        TextBoxSpeed = "0",
                         IsEnabled = true,
                         Db = _LoadIndividualVoicesSettingsDb,
                         StatusReporter = this
