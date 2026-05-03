@@ -70,7 +70,9 @@ namespace ToltoonTTS2.Services.TTS
                     text = Transliteration.LatinToCyrillic(text);
                     text = Regex.Replace(text, "q", "к", RegexOptions.IgnoreCase);
                     text = Regex.Replace(text, "w", "в", RegexOptions.IgnoreCase);
-                    text = Regex.Replace(text, "y", "и", RegexOptions.IgnoreCase);
+                    text = Regex.Replace(text, "y",  "и", RegexOptions.IgnoreCase);
+                    //text = Regex.Replace(text, "h", "х", RegexOptions.IgnoreCase);
+                    text = Regex.Replace(text, "ѵ", "й", RegexOptions.IgnoreCase);
                 }
                 else
                 {
