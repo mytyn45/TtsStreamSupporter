@@ -6,7 +6,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.WebSockets;
 using System.Text;
-using ToltoonTTS2.Services.Goodgame.Connection;
 
 namespace ToltoonTTS2.Services.VK
 {

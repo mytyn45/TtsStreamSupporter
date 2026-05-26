@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using ToltoonTTS2.Services.BlackList;
+using ToltoonTTS2.Services.Blu3star_s_chat;
 using ToltoonTTS2.Services.EnsureFolderAndFileExist;
 using ToltoonTTS2.Services.Goodgame.Connection;
 using ToltoonTTS2.Services.SaveLoadSettings;
@@ -107,6 +108,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         private string _piperVoiceForDeleting = string.Empty;
         private readonly ITwitchGetID _twitchGetId;
         private readonly ITwitchConnectToChat _twitchConnectToChat;
+        private readonly IBlu3starConnection _blu3starConnectToChat;
         private readonly IGoodgameConnection _goodgameConnectionToChat;
         private readonly IYoutubeConnection _youtubeConnectionToChat;
         private readonly IVkConnection _vkConnectionToChat;
@@ -157,6 +159,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             IGoodgameConnection goodgameConnectionToChat,
             IYoutubeConnection youtubeConnectionToChat,
             IVkConnection vkConnectionToChat,
+            IBlu3starConnection blu3starConnectToChat,
             AdditionalSettingsViewModel additionalSettings)
         {
             AdditionalSettings = additionalSettings;
@@ -172,6 +175,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             _blackListServices = blackListSerives;
             _wordReplaceService = wordReplaceService;
             _messageProcessing = messageProcessing;
+            _blu3starConnectToChat = blu3starConnectToChat;
 
             using var loggerFactory = LoggerFactory.Create(builder =>
             {
@@ -248,6 +252,12 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
 
             //получение сообщений
             _twitchConnectToChat.MessageReceived += OnTwitchMessageReceived;
+            _blu3starConnectToChat.MessageReceived += (sender, e) =>
+            {
+                var message = _messageProcessing.ProcessIncomingMessage(e.UserName, e.Message, "twitch");
+                if (message != null)
+                    _ttsService.Speak(message);
+            };
             _goodgameConnectionToChat.MessageReceived += (sender, e) =>
             {
                 // обработка сообщения
@@ -520,6 +530,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
 
         private async Task ConnectToStreamingChats()
         {
+;
+
             if (string.IsNullOrWhiteSpace(SelectedVoice) || SelectedVoice.Length <= 2)
             {
                 using var synth = new SpeechSynthesizer();
@@ -582,6 +594,9 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 };
                 await _vkConnectionToChat.Connection(VkLogin, VkSecretApi, VkAppId);
             }
+
+            await _blu3starConnectToChat.Blue3starConnect();
+
         }
 
         // Команды
