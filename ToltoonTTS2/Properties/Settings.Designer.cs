@@ -379,5 +379,29 @@ namespace ToltoonTTS2.Properties {
                 this["AudioEffectsJson"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string Blu3starApi {
+            get {
+                return ((string)(this["Blu3starApi"]));
+            }
+            set {
+                this["Blu3starApi"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ConnectToBlu3star {
+            get {
+                return ((bool)(this["ConnectToBlu3star"]));
+            }
+            set {
+                this["ConnectToBlu3star"] = value;
+            }
+        }
     }
 }

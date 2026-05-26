@@ -28,10 +28,12 @@ class VibratoSampleProvider : ISampleProvider
     public static float CalculateRmsNormalizationGain(ISampleProvider provider, float targetRms = 0.15f)
     {
         double sumSquares = 0.0;
-        long totalSamples = 0;
+        int totalSamples = 0;
 
         float[] buffer = new float[4096];
         int read;
+
+        int maxSamples = 44100 * 2; // ограничение
 
         while ((read = provider.Read(buffer, 0, buffer.Length)) > 0)
         {
@@ -40,7 +42,11 @@ class VibratoSampleProvider : ISampleProvider
                 float s = buffer[i];
                 sumSquares += s * s;
             }
+
             totalSamples += read;
+
+            if (totalSamples >= maxSamples)
+                break;
         }
 
         if (totalSamples == 0)
@@ -53,11 +59,7 @@ class VibratoSampleProvider : ISampleProvider
 
         float gain = (float)(targetRms / rms);
 
-        // ограничение, чтобы не усиливать слишком сильно
-        if (gain > 10f)
-            gain = 10f;
-
-        return gain;
+        return Math.Min(gain, 10f);
     }
 
 
@@ -112,7 +114,6 @@ class RobotSampleProvider : ISampleProvider
     private readonly ISampleProvider source;
     private double phase;
     private readonly float freq;
-    private readonly float mix;
     private readonly float depth;
     private float smoothedMod = 1f;
 
@@ -120,7 +121,6 @@ class RobotSampleProvider : ISampleProvider
     {
         this.source = source;
         this.freq = frequency;
-        this.mix = Math.Clamp(mix, 0f, 1f);
         this.depth = Math.Clamp(depth, 0f, 1f);
     }
 

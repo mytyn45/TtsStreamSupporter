@@ -58,7 +58,26 @@ namespace TwitchLib.EventSub.Websockets.Example
                     _userId
                 }
             };
-                await _twitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync("channel.channel_points_custom_reward_redemption.add", "1", condition, TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket, _eventSubWebsocketClient.SessionId);
+                try
+                {
+                    await _twitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                        "channel.channel_points_custom_reward_redemption.add",
+                        "1",
+                        condition,
+                        TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
+                        _eventSubWebsocketClient.SessionId);
+                }
+                catch (TwitchLib.Api.Core.Exceptions.BadTokenException ex)
+                {
+                    if (ex.Message.Contains("did not match the associated user"))
+                    {
+                        // Игнорируем ошибку
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
                 _logger.LogInformation("Subscription created successfully.");
             }
         }

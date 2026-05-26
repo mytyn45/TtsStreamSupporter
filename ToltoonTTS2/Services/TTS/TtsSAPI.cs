@@ -169,27 +169,24 @@ namespace ToltoonTTS2.Services.TTS
                 return;
             }
 
-            // 1. Создаём провайдер для анализа
-            var analysisProvider = reader.ToSampleProvider();
+            float normalizationGain = 1f;
+            if (_audioEffectsSettings.Normalization?.Enabled == true)
+            {
+                if (_audioEffectsSettings.Normalization?.Enabled == true)
+                {
+                    var analysisProvider = reader.ToSampleProvider();
+                    float targetRms = ResolveNormalizationTargetRms(_audioEffectsSettings.Normalization);
+                    normalizationGain = VibratoSampleProvider.CalculateRmsNormalizationGain(analysisProvider, targetRms);
+                    reader.Position = 0;
+                }
+            }
 
-            // 2. Считаем RMS
-            float gain = VibratoSampleProvider.CalculateRmsNormalizationGain(analysisProvider);
-
-            // 3. Перематываем поток
-            reader.Position = 0;
-
-            // 4. Создаём основной провайдер
             ISampleProvider chain = reader.ToSampleProvider();
 
             chain = ApplySingleAudioEffect(chain);
+            chain = ApplyNormalizationIfEnabled(chain, normalizationGain);
 
-            // 5. Применяем нормализацию
-            chain = new VolumeSampleProvider(chain)
-            {
-                //Volume = gain
-            };
-
-            // 6. Воспроизведение
+            //Воспроизведение
             _waveOut = new WaveOutEvent();
             _waveOut.Init(chain);
 
@@ -283,7 +280,7 @@ namespace ToltoonTTS2.Services.TTS
                     float strength = NormalizeStrength(_audioEffectsSettings.Vibrato.Strength);
                     float rate = 1f + strength * 11f;
                     float depth = 1f + strength * 19f;
-                    return new VibratoSampleProvider(sp, rate, depth);
+                    return new VibratoSampleProvider(sp, rate, depth, wetMix: 1f);
                 });
             }
 
@@ -293,22 +290,22 @@ namespace ToltoonTTS2.Services.TTS
                 {
                     float strength = NormalizeStrength(_audioEffectsSettings.Robot.Strength);
                     float frequency = 10f + strength * 110f;
-                    float mix = 0.2f + strength * 0.8f;
-                    return new RobotSampleProvider(sp, frequency, mix);
+                    float depth = 0.2f + strength * 0.8f;
+                    return new RobotSampleProvider(sp, frequency, depth);
                 });
             }
 
-            if (CanApply(_audioEffectsSettings.Delay))
-            {
-                available.Add(sp =>
-                {
-                    float strength = NormalizeStrength(_audioEffectsSettings.Delay.Strength);
-                    int delayMs = (int)(80 + strength * 720);
-                    float feedback = 0.1f + strength * 0.75f;
-                    float mix = 0.15f + strength * 0.75f;
-                    return new DelaySampleProvider(sp, delayMs, feedback, mix);
-                });
-            }
+            //if (CanApply(_audioEffectsSettings.Delay))
+            //{
+            //    available.Add(sp =>
+            //    {
+            //        float strength = NormalizeStrength(_audioEffectsSettings.Delay.Strength);
+            //        int delayMs = (int)(80 + strength * 720);
+            //        float feedback = 0.1f + strength * 0.75f;
+            //        float mix = 0.15f + strength * 0.75f;
+            //        return new DelaySampleProvider(sp, delayMs, feedback, mix);
+            //    });
+            //}
 
             if (CanApply(_audioEffectsSettings.Distortion))
             {
@@ -316,7 +313,7 @@ namespace ToltoonTTS2.Services.TTS
                 {
                     float strength = NormalizeStrength(_audioEffectsSettings.Distortion.Strength);
                     float gain = 1f + strength * 19f;
-                    float mix = 0.15f + strength * 0.85f;
+                    float mix = 1f;
                     return new DistortionSampleProvider(sp, gain, mix);
                 });
             }
@@ -326,6 +323,26 @@ namespace ToltoonTTS2.Services.TTS
 
             int index = _random.Next(available.Count);
             return available[index](chain);
+        }
+
+        private ISampleProvider ApplyNormalizationIfEnabled(ISampleProvider chain, float gain)
+        {
+            if (_audioEffectsSettings.Normalization?.Enabled != true)
+                return chain;
+
+            return new VolumeSampleProvider(chain)
+            {
+                Volume = Math.Clamp(gain, 0f, 10f)
+            };
+        }
+
+        private static float ResolveNormalizationTargetRms(EffectSetting? normalizationSettings)
+        {
+            if (normalizationSettings == null)
+                return 0.15f;
+
+            float normalizedVolume = Math.Clamp(normalizationSettings.Strength, 0, 100) / 100f;
+            return 0.05f + (normalizedVolume * 0.25f);
         }
 
         private bool CanApply(EffectSetting effect)

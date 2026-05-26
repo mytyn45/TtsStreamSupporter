@@ -17,9 +17,11 @@ namespace ToltoonTTS2.Services.SaveLoadSettings
             return new AppSettings
             {
                 TwitchApi = Settings.Default.TwitchApi,
+                Blu3starApi = Settings.Default.Blu3starApi,
                 TwitchClientId = Settings.Default.TwitchID,
                 TwitchNickname = Settings.Default.TwitchNickname,
                 ConnectToTwitch = Settings.Default.ConnectToTwitch,
+                ConnectToBlu3star = Settings.Default.ConnectToBlu3star,
                 GoodgameNickname = Settings.Default.GoodgameNickname,
                 ConnectToGoodgame = Settings.Default.ConnectToGoodgame,
                 RemoveEmoji = Settings.Default.RemoveEmoji,
@@ -52,6 +54,7 @@ namespace ToltoonTTS2.Services.SaveLoadSettings
                 DistortionEnabled = effects.Distortion.Enabled,
                 DistortionStrength = effects.Distortion.Strength,
                 DistortionChance = effects.Distortion.Chance,
+                NormalizationEnabled = effects.Normalization.Enabled
             };
         }
 
@@ -78,12 +81,19 @@ namespace ToltoonTTS2.Services.SaveLoadSettings
             Settings.Default.ConnectToVkCheckBox = settings.ConnectToVk;
             Settings.Default.ConnectToVkAppId = settings.VkOpenApi;
             Settings.Default.ConnectToVkSecretApi = settings.VkSecretApi;
+            Settings.Default.ConnectToBlu3star = settings.ConnectToBlu3star;
+            Settings.Default.Blu3starApi = settings.Blu3starApi;
             var effectSettings = new AudioEffectSettings
             {
                 Vibrato = new EffectSetting { Enabled = settings.VibratoEnabled, Strength = settings.VibratoStrength, Chance = settings.VibratoChance },
                 Robot = new EffectSetting { Enabled = settings.RobotEnabled, Strength = settings.RobotStrength, Chance = settings.RobotChance },
                 Delay = new EffectSetting { Enabled = settings.DelayEnabled, Strength = settings.DelayStrength, Chance = settings.DelayChance },
                 Distortion = new EffectSetting { Enabled = settings.DistortionEnabled, Strength = settings.DistortionStrength, Chance = settings.DistortionChance },
+                Normalization = new EffectSetting
+                {
+                    Enabled = settings.NormalizationEnabled,
+                    Strength = settings.NormalizationTargetVolume
+                },
             };
             Settings.Default.AudioEffectsJson = JsonSerializer.Serialize(effectSettings);
 
@@ -91,7 +101,7 @@ namespace ToltoonTTS2.Services.SaveLoadSettings
             foreach (var item in settings.BlackListMembers)
             {
                 blackListMembers.Add(item);
-            }
+            }            
             Settings.Default.BlackListMembers = blackListMembers;
 
             var WhatToReplace = new System.Collections.Specialized.StringCollection();

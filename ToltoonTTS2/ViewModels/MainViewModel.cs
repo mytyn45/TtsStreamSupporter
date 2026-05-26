@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using ToltoonTTS2.Services.BlackList;
+using ToltoonTTS2.Services.Blu3star_s_chat;
 using ToltoonTTS2.Services.EnsureFolderAndFileExist;
 using ToltoonTTS2.Services.Goodgame.Connection;
 using ToltoonTTS2.Services.SaveLoadSettings;
@@ -63,6 +64,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         private bool _connectToGoodgame;
         private bool _connectToYoutube;
         private bool _connectToVk;
+        private string _blu3starApi;
+        private bool _connectToBlu3star;
         private string _youtubeId = string.Empty;
         private bool _removeEmoji;
         private string _selectedVoice = string.Empty;
@@ -107,6 +110,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         private string _piperVoiceForDeleting = string.Empty;
         private readonly ITwitchGetID _twitchGetId;
         private readonly ITwitchConnectToChat _twitchConnectToChat;
+        private readonly IBlu3starConnection _blu3starConnectToChat;
         private readonly IGoodgameConnection _goodgameConnectionToChat;
         private readonly IYoutubeConnection _youtubeConnectionToChat;
         private readonly IVkConnection _vkConnectionToChat;
@@ -134,11 +138,14 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         private int _robotEffectChance;
         private bool _delayEffectEnabled;
         private bool _normalizationEffectEnabled;
+        private int _normalizationTargetVolume = 50;
         private int _delayEffectStrength = 50;
         private int _delayEffectChance;
         private bool _distortionEffectEnabled;
         private int _distortionEffectStrength = 50;
         private int _distortionEffectChance;
+        private CancellationTokenSource? _autoSaveDebounceCts;
+        private const int AutoSaveDebounceMs = 600;
 
         public MainViewModel
             (ITwitchGetID twitchGetId, 
@@ -154,6 +161,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             IGoodgameConnection goodgameConnectionToChat,
             IYoutubeConnection youtubeConnectionToChat,
             IVkConnection vkConnectionToChat,
+            IBlu3starConnection blu3starConnectToChat,
             AdditionalSettingsViewModel additionalSettings)
         {
             AdditionalSettings = additionalSettings;
@@ -169,6 +177,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             _blackListServices = blackListSerives;
             _wordReplaceService = wordReplaceService;
             _messageProcessing = messageProcessing;
+            _blu3starConnectToChat = blu3starConnectToChat;
 
             using var loggerFactory = LoggerFactory.Create(builder =>
             {
@@ -204,6 +213,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             buttonMakeEnabledVoicesQuiet = new RelayCommand(() => ChangeEnabledVoicesVolume(-1));
             InstallPiperVoice = new RelayCommand(() => InstallPiperVoices(PiperVoiceName));
             DeletePiperVoice = new RelayCommand(() => DeletePiperVoices(PiperSelectedVoice));
+
             DynamicSpeedValues.Clear();
 
             var raw = Properties.Settings.Default.DynamicSpeed;
@@ -245,6 +255,12 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
 
             //получение сообщений
             _twitchConnectToChat.MessageReceived += OnTwitchMessageReceived;
+            _blu3starConnectToChat.MessageReceived += (sender, e) =>
+            {
+                var message = _messageProcessing.ProcessIncomingMessage(e.UserName, e.Message, "twitch");
+                if (message != null)
+                    _ttsService.Speak(message);
+            };
             _goodgameConnectionToChat.MessageReceived += (sender, e) =>
             {
                 // обработка сообщения
@@ -517,6 +533,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
 
         private async Task ConnectToStreamingChats()
         {
+;
+
             if (string.IsNullOrWhiteSpace(SelectedVoice) || SelectedVoice.Length <= 2)
             {
                 using var synth = new SpeechSynthesizer();
@@ -579,6 +597,11 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 };
                 await _vkConnectionToChat.Connection(VkLogin, VkSecretApi, VkAppId);
             }
+            if (ConnectToBlu3star)
+            {
+                await _blu3starConnectToChat.Blue3starConnect(Blu3starApi);
+            }
+
         }
 
         // Команды
@@ -601,6 +624,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         public ICommand buttonMakeEnabledVoicesQuiet { get; }
         public ICommand InstallPiperVoice { get; set; }
         public ICommand DeletePiperVoice { get; set; }
+        public ICommand OpenBlu3starLink { get; } = new RelayCommand(() =>
+    Process.Start(new ProcessStartInfo("https://twitch.catgc.com") { UseShellExecute = true }));
 
         // Свойства
         public string TwitchApi
@@ -741,6 +766,18 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         {
             get => _connectToVk;
             set { _connectToVk = value; OnPropertyChanged(); }
+        }
+
+        public string Blu3starApi
+        {
+            get => _blu3starApi;
+            set { _blu3starApi = value; OnPropertyChanged(); }
+        }
+
+        public bool ConnectToBlu3star
+        {
+            get => _connectToBlu3star;
+            set { _connectToBlu3star = value; OnPropertyChanged(); }
         }
 
         public bool RemoveEmoji
@@ -938,17 +975,6 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             }
         }
 
-        public bool NormalizarionEffectEnabled
-        {
-            get => _normalizationEffectEnabled;
-            set
-            {
-                OnPropertyChanged();
-                ApplyAudioEffectSettings();
-                _normalizationEffectEnabled = value;
-            }
-        }
-
         public int DelayEffectStrength
         {
             get => _delayEffectStrength;
@@ -1010,6 +1036,17 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             set
             {
                 _normalizationEffectEnabled = value;
+                OnPropertyChanged();
+                ApplyAudioEffectSettings();
+            }
+        }
+
+        public int NormalizationTargetVolume
+        {
+            get => _normalizationTargetVolume;
+            set
+            {
+                _normalizationTargetVolume = Math.Clamp(value, 0, 100);
                 OnPropertyChanged();
                 ApplyAudioEffectSettings();
             }
@@ -1191,6 +1228,10 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             DistortionEffectEnabled = settings.DistortionEnabled;
             DistortionEffectStrength = settings.DistortionStrength;
             DistortionEffectChance = settings.DistortionChance;
+            NormalizationEffectEnabled = settings.NormalizationEnabled;
+            NormalizationTargetVolume = settings.NormalizationTargetVolume;
+            ConnectToBlu3star = settings.ConnectToBlu3star;
+            Blu3starApi = settings.Blu3starApi;
             ApplyAudioEffectSettings();
             //напоминание сделать для выделения сообщения цветом
 
@@ -1348,6 +1389,12 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         {
             var values = DynamicSpeedValues.Select(x => x.Value);
             _ttsService.SetDynamicSpeed(values);
+            ScheduleAutoSave();
+        }
+
+        private void SaveDynamicSpeedToSettings()
+        {
+            var values = DynamicSpeedValues.Select(x => x.Value);
             var joined = string.Join(",", values);
             Properties.Settings.Default.DynamicSpeed = joined;
             Properties.Settings.Default.Save();
@@ -1393,7 +1440,11 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 DelayChance = DelayEffectChance,
                 DistortionEnabled = DistortionEffectEnabled,
                 DistortionStrength = DistortionEffectStrength,
-                DistortionChance = DistortionEffectChance
+                DistortionChance = DistortionEffectChance,
+                NormalizationEnabled = NormalizationEffectEnabled,
+                NormalizationTargetVolume = NormalizationTargetVolume,
+                Blu3starApi = Blu3starApi,
+                ConnectToBlu3star = ConnectToBlu3star
             };
             foreach (var uiItem in ItemSourceAllVoices)
             {
@@ -1410,6 +1461,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 _LoadIndividualVoicesSettingsDb.Update(dbItem);
             }
             _serviceSettings.SaveSettings(settings);
+            SaveDynamicSpeedToSettings();
         }
 
         private async Task ClearStatusAsync(Action<string> setValue, int ms = 5000)
@@ -1469,9 +1521,13 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 or nameof(VibratoEffectEnabled) or nameof(VibratoEffectStrength) or nameof(VibratoEffectChance)
                 or nameof(RobotEffectEnabled) or nameof(RobotEffectStrength) or nameof(RobotEffectChance)
                 or nameof(DelayEffectEnabled) or nameof(DelayEffectStrength) or nameof(DelayEffectChance)
-                or nameof(DistortionEffectEnabled) or nameof(DistortionEffectStrength) or nameof(DistortionEffectChance))
+                or nameof(DistortionEffectEnabled) or nameof(DistortionEffectStrength) or nameof(DistortionEffectChance)
+                or nameof(NormalizationEffectEnabled) or nameof(NormalizationTargetVolume)
+                or nameof(Blu3starApi) or nameof(ConnectToBlu3star))
+                
             {
-                SaveSettings();
+                //SaveSettings();
+                ScheduleAutoSave();
             }
         }
 
@@ -1506,7 +1562,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 Normalization = new EffectSetting
                 {
 
-                    Enabled = NormalizationEffectEnabled
+                    Enabled = NormalizationEffectEnabled,
+                    Strength = NormalizationTargetVolume
                 }
 
 
@@ -1518,8 +1575,43 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         {
             if (_autoSaveEnabled)
             {
-                SaveSettings();
+                ScheduleAutoSave();
             }
+        }
+
+        private void ScheduleAutoSave()
+        {
+            _autoSaveDebounceCts?.Cancel();
+            _autoSaveDebounceCts?.Dispose();
+
+            var cts = new CancellationTokenSource();
+            _autoSaveDebounceCts = cts;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(AutoSaveDebounceMs, cts.Token);
+                    var dispatcher = Application.Current?.Dispatcher;
+                    if (dispatcher != null)
+                    {
+                        await dispatcher.InvokeAsync(() =>
+                        {
+                            if (_autoSaveEnabled && !cts.Token.IsCancellationRequested)
+                            {
+                                SaveSettings();
+                            }
+                        });
+                    }
+                    else if (_autoSaveEnabled && !cts.Token.IsCancellationRequested)
+                    {
+                        SaveSettings();
+                    }
+                }
+                catch (TaskCanceledException)
+                {
+                }
+            });
         }
     }
 

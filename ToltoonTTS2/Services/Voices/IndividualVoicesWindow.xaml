@@ -9,7 +9,7 @@
 
     <StackPanel>
         <StackPanel>
-            <Button Content="Сохранить" Height="30" Margin="5" Command="{Binding SaveCommand}"/>
+        <Button Content="Сохранить" Height="30" Margin="5" Command="{Binding SaveCommand}"/>
             <TextBox Margin="5,0,5,5"
                      Height="24"
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"

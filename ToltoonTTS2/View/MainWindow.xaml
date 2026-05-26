@@ -11,10 +11,11 @@
 
     <Viewbox Stretch="Uniform">
         <Grid Width="670" Height="450">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition/>
-            </Grid.ColumnDefinitions>
-                <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+
+        <Grid>
             <TabControl x:Name="TabControlMainWindow" MinWidth="450" MaxWidth="510" Width="510" HorizontalAlignment="Left" VerticalAlignment="Top" SelectionChanged="TabControlMainWindow_SelectionChanged">
                 <TabItem x:Name="TabItemConnection" Header="Подключение">
                     <StackPanel>
@@ -88,7 +89,12 @@
                             </StackPanel>
                         </Grid>
                         <Grid>
-                            <StackPanel HorizontalAlignment="Left">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel HorizontalAlignment="Left" Grid.Column="0" Margin="0,5,0,0">
                                 <Label Content="Вконтакте" HorizontalAlignment="Center" />
                                 <Border BorderBrush="Black" BorderThickness="1" Margin="5" Width="190">
                                     <StackPanel x:Name="StackVkConnection" Orientation="Vertical" Margin="10,0,0,0">
@@ -109,6 +115,25 @@
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
+
+                                <StackPanel Grid.Column="1" Margin="5">
+                                        <Label Content="Blu3Star" HorizontalAlignment="Center"></Label>
+                                    <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,0" Width="190">
+                                        <StackPanel Orientation="Vertical">
+                                            
+                                        <StackPanel Orientation="Horizontal">
+                                            
+                                        <TextBox Text="{Binding Blu3starApi, UpdateSourceTrigger=PropertyChanged}" Width="50" MaxHeight="20" Margin="10,0,5,0" HorizontalAlignment="Left" VerticalAlignment="Center"></TextBox>
+                                            <Label>
+                                                <Hyperlink Command="{Binding OpenBlu3starLink}">
+                                                    Api
+                                                </Hyperlink>
+                                            </Label>
+                                        </StackPanel>
+                                            <CheckBox x:Name="CheckBoxConnectToBlu3star" IsChecked="{Binding ConnectToBlu3star, UpdateSourceTrigger=PropertyChanged}" Content="Подключаться" Margin="10,5,0,10"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
                         </Grid>
 
                         <GridSplitter Grid.Column="1" Width="5" VerticalAlignment="Stretch" ShowsPreview="True"/>
@@ -408,27 +433,14 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8" Width="120" HorizontalAlignment="left">
-                                    <StackPanel>
-                                        <CheckBox Content="Нормализация" IsChecked="{Binding DelayEffectEnabled, UpdateSourceTrigger=PropertyChanged}"/>
-                                    </StackPanel>
+                                <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8">                                    <StackPanel>
+                                        <CheckBox Content="Нормализация" IsChecked="{Binding NormalizationEffectEnabled, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Label Content="Громкость, %" Width="90"/>
+                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding NormalizationTargetVolume, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBlock Text="{Binding NormalizationTargetVolume}" Margin="10,0,0,0"/>
+                                        </StackPanel>                                    </StackPanel>
                                 </Border>
-                                
-                                <!--<Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8">
-                                    <StackPanel>
-                                        <CheckBox Content="Эхо/Delay" IsChecked="{Binding DelayEffectEnabled, UpdateSourceTrigger=PropertyChanged}"/>
-                                        <StackPanel Orientation="Horizontal">
-                                            <Label Content="Сила" Width="70"/>
-                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding DelayEffectStrength, UpdateSourceTrigger=PropertyChanged}"/>
-                                            <TextBlock Text="{Binding DelayEffectStrength}" Margin="10,0,0,0"/>
-                                        </StackPanel>
-                                        <StackPanel Orientation="Horizontal">
-                                            <Label Content="Шанс, %" Width="70"/>
-                                            <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding DelayEffectChance, UpdateSourceTrigger=PropertyChanged}"/>
-                                            <TextBlock Text="{Binding DelayEffectChance}" Margin="10,0,0,0"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Border>-->
 
                                 <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,5" Padding="8">
                                     <StackPanel>
@@ -448,7 +460,7 @@
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
-                    <TabItem x:Name="TabItemAdditionalFunction" 
+                <TabItem x:Name="TabItemAdditionalFunction" 
                          Header="Разное">
                     <TabItem.Style>
                         <Style TargetType="TabItem">
@@ -578,6 +590,8 @@
                         <Label x:Name="LabelVkStatusMessage"
                    Content="{Binding VkConnectionStatus, UpdateSourceTrigger=PropertyChanged}" />
 
+                        <Label x:Name="LabelBlu3starStatusMessage"></Label>
+
                         <StackPanel Orientation="Vertical">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                                 <Button x:Name="buttonConnect" Command="{Binding ConnectToChats}" Content="Connect" HorizontalAlignment="Left" Margin="10,10,0,0"/>
@@ -599,13 +613,13 @@
             </Grid>
         </Grid>
         <Button Margin="0,0,45,20" Content="Переподключиться" ToolTip="Работает только с Twitch (пока что)" VerticalAlignment="Bottom" HorizontalAlignment="right" IsEnabled="False"/>
-            <Label x:Name="LabelProgramVersion" Content="1.2.3 preview x86" HorizontalAlignment="Right" VerticalAlignment="Bottom"></Label>
+        <Label x:Name="LabelProgramVersion" Content="1.2.4.1 x86" HorizontalAlignment="Right" VerticalAlignment="Bottom"></Label>
             <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,2,55" BorderBrush="DarkGray" BorderThickness="1" Padding="6">
                 <StackPanel Width="140">
                     <Label Content="{Binding PiperLoadStatus}" FontSize="10" Padding="0"/>
                     <ProgressBar Minimum="0" Maximum="100" Value="{Binding PiperLoadProgress}" Height="16"/>
                 </StackPanel>
             </Border>
-        </Grid>
+    </Grid>
     </Viewbox>
 </Window>
