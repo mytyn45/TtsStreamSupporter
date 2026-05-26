@@ -17,9 +17,11 @@ namespace ToltoonTTS2.Services.SaveLoadSettings
             return new AppSettings
             {
                 TwitchApi = Settings.Default.TwitchApi,
+                Blu3starApi = Settings.Default.Blu3starApi,
                 TwitchClientId = Settings.Default.TwitchID,
                 TwitchNickname = Settings.Default.TwitchNickname,
                 ConnectToTwitch = Settings.Default.ConnectToTwitch,
+                ConnectToBlu3star = Settings.Default.ConnectToBlu3star,
                 GoodgameNickname = Settings.Default.GoodgameNickname,
                 ConnectToGoodgame = Settings.Default.ConnectToGoodgame,
                 RemoveEmoji = Settings.Default.RemoveEmoji,
@@ -79,6 +81,8 @@ namespace ToltoonTTS2.Services.SaveLoadSettings
             Settings.Default.ConnectToVkCheckBox = settings.ConnectToVk;
             Settings.Default.ConnectToVkAppId = settings.VkOpenApi;
             Settings.Default.ConnectToVkSecretApi = settings.VkSecretApi;
+            Settings.Default.ConnectToBlu3star = settings.ConnectToBlu3star;
+            Settings.Default.Blu3starApi = settings.Blu3starApi;
             var effectSettings = new AudioEffectSettings
             {
                 Vibrato = new EffectSetting { Enabled = settings.VibratoEnabled, Strength = settings.VibratoStrength, Chance = settings.VibratoChance },

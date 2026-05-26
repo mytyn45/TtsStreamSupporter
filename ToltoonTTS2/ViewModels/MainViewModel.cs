@@ -64,6 +64,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         private bool _connectToGoodgame;
         private bool _connectToYoutube;
         private bool _connectToVk;
+        private string _blu3starApi;
+        private bool _connectToBlu3star;
         private string _youtubeId = string.Empty;
         private bool _removeEmoji;
         private string _selectedVoice = string.Empty;
@@ -211,6 +213,7 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             buttonMakeEnabledVoicesQuiet = new RelayCommand(() => ChangeEnabledVoicesVolume(-1));
             InstallPiperVoice = new RelayCommand(() => InstallPiperVoices(PiperVoiceName));
             DeletePiperVoice = new RelayCommand(() => DeletePiperVoices(PiperSelectedVoice));
+
             DynamicSpeedValues.Clear();
 
             var raw = Properties.Settings.Default.DynamicSpeed;
@@ -594,8 +597,10 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 };
                 await _vkConnectionToChat.Connection(VkLogin, VkSecretApi, VkAppId);
             }
-
-            await _blu3starConnectToChat.Blue3starConnect();
+            if (ConnectToBlu3star)
+            {
+                await _blu3starConnectToChat.Blue3starConnect(Blu3starApi);
+            }
 
         }
 
@@ -619,6 +624,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         public ICommand buttonMakeEnabledVoicesQuiet { get; }
         public ICommand InstallPiperVoice { get; set; }
         public ICommand DeletePiperVoice { get; set; }
+        public ICommand OpenBlu3starLink { get; } = new RelayCommand(() =>
+    Process.Start(new ProcessStartInfo("https://twitch.catgc.com") { UseShellExecute = true }));
 
         // Свойства
         public string TwitchApi
@@ -759,6 +766,18 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         {
             get => _connectToVk;
             set { _connectToVk = value; OnPropertyChanged(); }
+        }
+
+        public string Blu3starApi
+        {
+            get => _blu3starApi;
+            set { _blu3starApi = value; OnPropertyChanged(); }
+        }
+
+        public bool ConnectToBlu3star
+        {
+            get => _connectToBlu3star;
+            set { _connectToBlu3star = value; OnPropertyChanged(); }
         }
 
         public bool RemoveEmoji
@@ -1211,6 +1230,8 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
             DistortionEffectChance = settings.DistortionChance;
             NormalizationEffectEnabled = settings.NormalizationEnabled;
             NormalizationTargetVolume = settings.NormalizationTargetVolume;
+            ConnectToBlu3star = settings.ConnectToBlu3star;
+            Blu3starApi = settings.Blu3starApi;
             ApplyAudioEffectSettings();
             //напоминание сделать для выделения сообщения цветом
 
@@ -1421,7 +1442,9 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 DistortionStrength = DistortionEffectStrength,
                 DistortionChance = DistortionEffectChance,
                 NormalizationEnabled = NormalizationEffectEnabled,
-                NormalizationTargetVolume = NormalizationTargetVolume
+                NormalizationTargetVolume = NormalizationTargetVolume,
+                Blu3starApi = Blu3starApi,
+                ConnectToBlu3star = ConnectToBlu3star
             };
             foreach (var uiItem in ItemSourceAllVoices)
             {
@@ -1499,7 +1522,9 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
                 or nameof(RobotEffectEnabled) or nameof(RobotEffectStrength) or nameof(RobotEffectChance)
                 or nameof(DelayEffectEnabled) or nameof(DelayEffectStrength) or nameof(DelayEffectChance)
                 or nameof(DistortionEffectEnabled) or nameof(DistortionEffectStrength) or nameof(DistortionEffectChance)
-                or nameof(NormalizationEffectEnabled) or nameof(NormalizationTargetVolume))
+                or nameof(NormalizationEffectEnabled) or nameof(NormalizationTargetVolume)
+                or nameof(Blu3starApi) or nameof(ConnectToBlu3star))
+                
             {
                 //SaveSettings();
                 ScheduleAutoSave();
@@ -1550,7 +1575,6 @@ AppDomain.CurrentDomain.BaseDirectory, @"DataForProgram\Voices\", "VkIndividualV
         {
             if (_autoSaveEnabled)
             {
-                //SaveSettings();
                 ScheduleAutoSave();
             }
         }

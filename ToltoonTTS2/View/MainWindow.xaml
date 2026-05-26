@@ -89,7 +89,12 @@
                             </StackPanel>
                         </Grid>
                         <Grid>
-                            <StackPanel HorizontalAlignment="Left">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel HorizontalAlignment="Left" Grid.Column="0" Margin="0,5,0,0">
                                 <Label Content="Вконтакте" HorizontalAlignment="Center" />
                                 <Border BorderBrush="Black" BorderThickness="1" Margin="5" Width="190">
                                     <StackPanel x:Name="StackVkConnection" Orientation="Vertical" Margin="10,0,0,0">
@@ -110,6 +115,25 @@
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
+
+                                <StackPanel Grid.Column="1" Margin="5">
+                                        <Label Content="Blu3Star" HorizontalAlignment="Center"></Label>
+                                    <Border BorderBrush="Black" BorderThickness="1" Margin="0,5,0,0" Width="190">
+                                        <StackPanel Orientation="Vertical">
+                                            
+                                        <StackPanel Orientation="Horizontal">
+                                            
+                                        <TextBox Text="{Binding Blu3starApi, UpdateSourceTrigger=PropertyChanged}" Width="50" MaxHeight="20" Margin="10,0,5,0" HorizontalAlignment="Left" VerticalAlignment="Center"></TextBox>
+                                            <Label>
+                                                <Hyperlink Command="{Binding OpenBlu3starLink}">
+                                                    Api
+                                                </Hyperlink>
+                                            </Label>
+                                        </StackPanel>
+                                            <CheckBox x:Name="CheckBoxConnectToBlu3star" IsChecked="{Binding ConnectToBlu3star, UpdateSourceTrigger=PropertyChanged}" Content="Подключаться" Margin="10,5,0,10"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
                         </Grid>
 
                         <GridSplitter Grid.Column="1" Width="5" VerticalAlignment="Stretch" ShowsPreview="True"/>
@@ -565,6 +589,8 @@
 
                         <Label x:Name="LabelVkStatusMessage"
                    Content="{Binding VkConnectionStatus, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <Label x:Name="LabelBlu3starStatusMessage"></Label>
 
                         <StackPanel Orientation="Vertical">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">

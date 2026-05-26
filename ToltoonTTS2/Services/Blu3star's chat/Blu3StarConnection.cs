@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using Newtonsoft.Json.Linq;
+using System.IO;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -7,7 +8,23 @@ using ToltoonTTS2.Services.Blu3star_s_chat;
 
 public class Blu3starConnection : IBlu3starConnection
 {
-    private readonly string _token;
+    public enum Blu3starConnectionState
+    {
+        Disconnected,
+        Connecting,
+        Connected,
+        Failed
+    }
+
+    private string _token;
+
+    private string _lastMessageId;
+
+    private Blu3starConnectionState CurrentState {get; set; }
+
+    Blu3starConnectionState IBlu3starConnection.CurrentState => CurrentState;
+
+    public event EventHandler<Blu3starConnectionState> ConnectionStateChanged;
 
     private ClientWebSocket _socket;
 
@@ -17,25 +34,20 @@ public class Blu3starConnection : IBlu3starConnection
 
     private int _reconnectDelayMs = 1000;
 
-    private string _lastMessageId;
+    private void UpdateState(Blu3starConnectionState newState)
+    {
+        if (CurrentState != newState)
+        {
+            CurrentState = newState;
+            ConnectionStateChanged?.Invoke(this, newState);
+        }
+    }
 
     protected virtual void OnMessageReceived(Blu3starMessageEventArgs e)
     {
         var abc = MessageReceived?.GetInvocationList().Length;
 
         MessageReceived?.Invoke(this, e);
-    }
-
-    public Blu3starConnection()
-    {
-        _token = "REMOVED_TOKEN";
-    }
-
-    public async Task Blue3starConnect()
-    {
-        _cts = new CancellationTokenSource();
-
-        await ConnectLoopAsync();
     }
 
     public async Task StopAsync()
@@ -65,7 +77,7 @@ public class Blu3starConnection : IBlu3starConnection
             {
                 await ConnectAsync();
 
-                _reconnectDelayMs = 1000;
+                _reconnectDelayMs = 3000;
 
                 await ReceiveLoopAsync();
             }
@@ -173,6 +185,13 @@ public class Blu3starConnection : IBlu3starConnection
         {
             Console.WriteLine($"JSON parse error: {ex}");
         }
+    }
+
+    public async Task Blue3starConnect(string Api)
+    {
+        _token = Api;
+        _cts = new CancellationTokenSource();
+        await ConnectLoopAsync();
     }
 }
 

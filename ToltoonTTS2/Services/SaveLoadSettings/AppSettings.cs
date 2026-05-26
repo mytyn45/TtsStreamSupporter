@@ -41,5 +41,7 @@
         public int DistortionChance { get; set; }
         public bool NormalizationEnabled { get; set; }
         public int NormalizationTargetVolume { get; set; }
+        public string Blu3starApi { get; set; }
+        public bool ConnectToBlu3star { get; set; }   
     }
 }
