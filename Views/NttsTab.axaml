@@ -1,0 +1,119 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TtsStreamSupporter.ViewModels"
+             x:Class="TtsStreamSupporter.Views.NttsTab"
+             x:DataType="vm:NttsTabViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.hyperlink">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="#2196F3"/>
+        </Style>
+        <Style Selector="Button.hyperlink:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="TextBlock.Foreground" Value="#64B5F6"/>
+            <Setter Property="TextBlock.TextDecorations" Value="Underline"/>
+        </Style>
+        <Style Selector="Button.hyperlink:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="TextBlock.Foreground" Value="#1976D2"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="Auto"
+          RowDefinitions="*,Auto">
+
+        <Border Grid.Column="0"
+                Grid.Row="0"
+                BorderBrush="Black"
+                BorderThickness="1"
+                Margin="5">
+
+            <StackPanel Spacing="10"
+                        Margin="10">
+
+                <Border BorderBrush="Gray"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12"
+                        MinWidth="340">
+
+                    <StackPanel Spacing="10">
+
+                        <TextBlock Text="Настройки NTTS"
+                                   FontWeight="Bold"
+                                   FontSize="14"/>
+
+                        <CheckBox Content="Включить NTTS"
+                                  IsChecked="{Binding CheckBoxNttsVoicesIsEnabled}"/>
+
+                        <StackPanel Spacing="4">
+                            <Label Content="API ключ"
+                                   Padding="0"/>
+
+                            <TextBox ToolTip.Tip="API ключ сервиса NTTS"
+                                     PlaceholderText="API ключ"
+                                     Text="{Binding NttsApi}"
+                                     MaxWidth="100" HorizontalAlignment="Left" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="4">
+                            <Label Content="Команда смены голоса"
+                                   Padding="0"/>
+
+                            <TextBox ToolTip.Tip="Команда для смены голоса зрителями в чате&#x0a;Формат: [команда] [id голоса]&#x0a;Пример: !s papich или !voice papich"
+                                     PlaceholderText="!пример"
+                                     Text="{Binding NttsVoiceChangeCommand}"
+                                     MaxWidth="100" HorizontalAlignment="Left"/>
+
+                            <TextBlock Text="Схема: [команда] [id голоса] (например: !s papich)"
+                                       FontSize="11"
+                                       Foreground="Gray"/>
+                        </StackPanel>
+
+                        <Button Content="Загрузить голоса"
+                                Command="{Binding ButtonLoadVoices}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                IsVisible="False" />
+
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   FontSize="11"
+                                   Foreground="Gray"/>
+
+                    </StackPanel>
+
+                </Border>
+
+            </StackPanel>
+
+        </Border>
+
+
+        <!-- Информационная плашка со ссылками на сайт NTTS -->
+        <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="2,0,0,0">
+            <TextBlock Text="Ntts - платный, подписку оформить можно тут "
+                       VerticalAlignment="Center"
+                       Foreground="Gray"/>
+            <Button Classes="hyperlink"
+                    Content="https://ntts.fdev.team/"
+                    ToolTip.Tip="Открыть https://ntts.fdev.team/ в браузере"
+                    Command="{Binding OpenUrlCommand}"
+                    CommandParameter="https://ntts.fdev.team/"
+                    VerticalAlignment="Center"/>
+            <TextBlock Text=" или "
+                       VerticalAlignment="Center"
+                       Foreground="Gray"/>
+            <Button Classes="hyperlink"
+                    Content="https://nttsfuckrkn.fdev.team/"
+                    ToolTip.Tip="Открыть https://nttsfuckrkn.fdev.team/ в браузере"
+                    Command="{Binding OpenUrlCommand}"
+                    CommandParameter="https://nttsfuckrkn.fdev.team/"
+                    VerticalAlignment="Center"/>
+        </WrapPanel>
+    </Grid>
+
+</UserControl>

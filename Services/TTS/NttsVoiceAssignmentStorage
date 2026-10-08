@@ -1,0 +1,50 @@
+public static class NttsVoiceAssignmentStorage
+{
+    private static string FilePath =>
+        Path.Combine(
+            AppContext.BaseDirectory,
+            "DataForProgram",
+            "NttsVoiceAssignments.json");
+
+    private static readonly JsonSerializerOptions _options = new()
+    {
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true
+    };
+
+    public static List<IndividualVoiceAssignment> Load()
+    {
+        try
+        {
+            if (!File.Exists(FilePath))
+                return new List<IndividualVoiceAssignment>();
+
+            string json = File.ReadAllText(FilePath);
+
+            return JsonSerializer.Deserialize<List<IndividualVoiceAssignment>>(json, _options)
+                   ?? new List<IndividualVoiceAssignment>();
+        }
+        catch
+        {
+            return new List<IndividualVoiceAssignment>();
+        }
+    }
+
+    public static void Save(IEnumerable<IndividualVoiceAssignment> assignments)
+    {
+        try
+        {
+            string? dir = Path.GetDirectoryName(FilePath);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+
+            string json = JsonSerializer.Serialize(assignments, _options);
+
+            File.WriteAllText(FilePath, json);
+        }
+        catch
+        {
+            // логирование по вкусу
+        }
+    }
+}
