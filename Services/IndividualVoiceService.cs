@@ -84,8 +84,12 @@ public class IndividualVoiceService
     // ============================================
     // ЗАГРУЗКА NTTS-ГОЛОСОВ ИЗ ФАЙЛА
     // ============================================
-
-    private static readonly HttpClient _httpClient = new();
+    private static readonly HttpClient _httpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(10)
+    };
+    private static DateTime _lastNttsDownloadAttemptUtc = DateTime.MinValue;
+    private static readonly TimeSpan NttsDownloadCooldown = TimeSpan.FromMinutes(2);
 
     public static string GetNttsVoicesFilePath()
     {
@@ -311,21 +315,29 @@ public class IndividualVoiceService
         //попытка скачать голоса, если файлика с ними нет
         if (_nttsVoiceNames.Count == 0)
         {
+            if (DateTime.UtcNow - _lastNttsDownloadAttemptUtc < NttsDownloadCooldown)
+            {
+                return null;
+            }
+
+            _lastNttsDownloadAttemptUtc = DateTime.UtcNow;
             Log.Warning("Локальный список NTTS-голосов пуст. Пробуем загрузить его с сервера.");
 
             bool loaded = await DownloadNttsVoicesAsync();
 
             if (!loaded)
-            {
-                Log.Error("Не удалось получить список NTTS-голосов");
-                return null;
-            }
+                if (!loaded || _nttsVoiceNames.Count == 0)
+                {
+                    Log.Error("Не удалось получить список NTTS-голосов");
+                    return null;
+                }
         }
 
-        string commandPrefix = _settings?.Settings.NttsVoiceChangeCommand?.Trim();
+        string? commandPrefix = _settings?.Settings.NttsVoiceChangeCommand?.Trim();
 
         string trimmedMessage = message.TrimStart();
-        if (trimmedMessage.StartsWith(commandPrefix, StringComparison.OrdinalIgnoreCase) &&
+        if (!string.IsNullOrWhiteSpace(commandPrefix) &&
+            trimmedMessage.StartsWith(commandPrefix, StringComparison.OrdinalIgnoreCase) &&
             (trimmedMessage.Length == commandPrefix.Length || char.IsWhiteSpace(trimmedMessage[commandPrefix.Length])))
         {
             string query = trimmedMessage[commandPrefix.Length..].Trim().Split(
@@ -413,6 +425,9 @@ public class IndividualVoiceService
             SaveNttsAssignments();
             return newVoice;
         }
+
+        if (_nttsVoiceNames.Count == 0)
+            return null;
 
         var selectedVoiceName = _nttsVoiceNames[_random.Next(_nttsVoiceNames.Count)];
         _nttsAssignments[userKey] = selectedVoiceName;

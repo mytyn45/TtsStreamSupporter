@@ -80,8 +80,9 @@ public class TtsMessageProcessing
         string? nttsCmd = _settings.Settings.NttsVoiceChangeCommand?.Trim();
         string trimmedStart = message.TrimStart();
 
-        // Проверяем, задана ли команда и начинается ли сообщение с неё
-        if (!string.IsNullOrEmpty(nttsCmd) &&
+        // Проверяем, задана ли команда и начинается ли сообщение с неё (только если NTTS включён)
+        if (_settings.Settings.CheckBoxNttsVoicesIsEnabled &&
+            !string.IsNullOrWhiteSpace(nttsCmd) &&
             trimmedStart.StartsWith(nttsCmd, StringComparison.OrdinalIgnoreCase) &&
             (trimmedStart.Length == nttsCmd.Length || char.IsWhiteSpace(trimmedStart[nttsCmd.Length])))
         {

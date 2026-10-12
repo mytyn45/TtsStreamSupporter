@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -11,7 +12,8 @@ namespace TtsStreamSupporter.Services;
 public class TwitchConnection : ConnectionBase
 {
     private const string TwitchIrcHost = "irc.chat.twitch.tv";
-    private const int TwitchIrcPort = 6667;
+    private const int TwitchIrcSslPort = 6697;
+    private const int TwitchIrcPlainPort = 6667;
 
     private TcpClient? _client;
     private StreamReader? _reader;
@@ -140,16 +142,16 @@ public class TwitchConnection : ConnectionBase
                     break;
 
                 // 2. Мы подключены — запускаем мониторинг heartbeat и читаем сообщения
-                using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                var heartbeatTask = Task.Run(() => HeartbeatLoopAsync(heartbeatCts.Token), heartbeatCts.Token);
+                using var sessionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var heartbeatTask = Task.Run(() => HeartbeatLoopAsync(sessionCts), sessionCts.Token);
 
                 try
                 {
-                    await ReadLoopAsync(ct);
+                    await ReadLoopAsync(sessionCts.Token);
                 }
                 finally
                 {
-                    heartbeatCts.Cancel();
+                    sessionCts.Cancel();
                     try { await heartbeatTask; } catch { }
                 }
             }
@@ -191,7 +193,7 @@ public class TwitchConnection : ConnectionBase
             {
                 message = await _reader.ReadLineAsync(ct);
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
                 break;
             }
@@ -234,8 +236,9 @@ public class TwitchConnection : ConnectionBase
         }
     }
 
-    private async Task HeartbeatLoopAsync(CancellationToken ct)
+    private async Task HeartbeatLoopAsync(CancellationTokenSource sessionCts)
     {
+        var ct = sessionCts.Token;
         while (!ct.IsCancellationRequested)
         {
             try
@@ -253,7 +256,8 @@ public class TwitchConnection : ConnectionBase
                 // Если прошло более 90 секунд и сервер так и не ответил — сокет завис
                 if (elapsed >= TimeSpan.FromSeconds(90))
                 {
-                    Log.Warning("Таймаут соединения с Twitch #{Channel} (нет активности более 90 сек). Перезапуск сокета...", _channelName);
+                    Log.Warning("Таймаут соединения с Twitch #{Channel} (нет активности более 90 сек). Принудительный сброс сокета...", _channelName);
+                    try { sessionCts.Cancel(); } catch { }
                     CloseSocketAndStreams();
                     break;
                 }
@@ -265,6 +269,7 @@ public class TwitchConnection : ConnectionBase
             catch (Exception ex)
             {
                 Log.Warning("Ошибка в heartbeat Twitch: {Error}", ex.Message);
+                try { sessionCts.Cancel(); } catch { }
                 CloseSocketAndStreams();
                 break;
             }
@@ -291,57 +296,87 @@ public class TwitchConnection : ConnectionBase
     {
         CloseSocketAndStreams();
 
-        try
+        int[] portsToTry = { TwitchIrcSslPort, TwitchIrcPlainPort };
+
+        foreach (int port in portsToTry)
         {
-            var client = new TcpClient();
-            client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+            if (ct.IsCancellationRequested)
+                return false;
 
-            await client.ConnectAsync(TwitchIrcHost, TwitchIrcPort, ct);
-
-            var stream = client.GetStream();
-            var reader = new StreamReader(stream, Encoding.UTF8);
-            var writer = new StreamWriter(stream, Encoding.UTF8)
-            {
-                NewLine = "\r\n",
-                AutoFlush = true
-            };
-
-            string anonymousNick = $"justinfan{Random.Shared.Next(10000, 99999)}";
-
-            await _writeLock.WaitAsync(ct);
             try
             {
-                await writer.WriteLineAsync("PASS SCHMOOPIIE".AsMemory(), ct);
-                await writer.WriteLineAsync($"NICK {anonymousNick}".AsMemory(), ct);
-                await writer.WriteLineAsync($"JOIN #{_channelName}".AsMemory(), ct);
+                var client = new TcpClient();
+                client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+                try
+                {
+                    client.Client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 30);
+                    client.Client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 5);
+                    client.Client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, 3);
+                }
+                catch { }
+
+                await client.ConnectAsync(TwitchIrcHost, port, ct);
+
+                Stream stream = client.GetStream();
+                if (port == TwitchIrcSslPort)
+                {
+                    var sslStream = new SslStream(stream, false);
+                    await sslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
+                    {
+                        TargetHost = TwitchIrcHost
+                    }, ct);
+                    stream = sslStream;
+                }
+
+                var reader = new StreamReader(stream, Encoding.UTF8);
+                var writer = new StreamWriter(stream, Encoding.UTF8)
+                {
+                    NewLine = "\r\n",
+                    AutoFlush = true
+                };
+
+                string anonymousNick = $"justinfan{Random.Shared.Next(10000, 99999)}";
+
+                await _writeLock.WaitAsync(ct);
+                try
+                {
+                    await writer.WriteLineAsync("PASS SCHMOOPIIE".AsMemory(), ct);
+                    await writer.WriteLineAsync($"NICK {anonymousNick}".AsMemory(), ct);
+                    await writer.WriteLineAsync($"JOIN #{_channelName}".AsMemory(), ct);
+                }
+                finally
+                {
+                    _writeLock.Release();
+                }
+
+                _client = client;
+                _reader = reader;
+                _writer = writer;
+                _lastMessageReceivedUtc = DateTime.UtcNow;
+
+                Log.Information("Успешно подключились к IRC Twitch #{Channel} через порт {Port}{Ssl}",
+                    _channelName, port, port == TwitchIrcSslPort ? " (SSL)" : "");
+                return true;
             }
-            finally
+            catch (OperationCanceledException)
             {
-                _writeLock.Release();
+                CloseSocketAndStreams();
+                return false;
             }
+            catch (Exception ex)
+            {
+                Log.Warning("Не удалось подключиться к Twitch #{Channel} через порт {Port}: {Error}",
+                    _channelName, port, ex.Message);
+                CloseSocketAndStreams();
+            }
+        }
 
-            _client = client;
-            _reader = reader;
-            _writer = writer;
-            _lastMessageReceivedUtc = DateTime.UtcNow;
-
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            CloseSocketAndStreams();
-            return false;
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Не удалось подключиться к IRC Twitch #{Channel}", _channelName);
-            CloseSocketAndStreams();
-            return false;
-        }
+        return false;
     }
 
     private void CloseSocketAndStreams()
     {
+        try { _client?.Client?.Close(0); } catch { }
         try { _writer?.Dispose(); } catch { }
         try { _reader?.Dispose(); } catch { }
         try { _client?.Close(); _client?.Dispose(); } catch { }
@@ -353,16 +388,33 @@ public class TwitchConnection : ConnectionBase
 
     private void ParseMessage(string message)
     {
-        int exclamationMark = message.IndexOf('!');
         int privMsg = message.IndexOf(" PRIVMSG ");
-        int messageStart = message.IndexOf(" :", privMsg);
-
-        if (exclamationMark == -1 || privMsg == -1 || messageStart == -1)
+        if (privMsg == -1)
         {
             return;
         }
 
-        string username = message.Substring(1, exclamationMark - 1);
+        int messageStart = message.IndexOf(" :", privMsg);
+        if (messageStart == -1)
+        {
+            return;
+        }
+
+        string prefix = message[..privMsg];
+        int exclamationMark = prefix.IndexOf('!');
+        if (exclamationMark == -1)
+        {
+            return;
+        }
+
+        int lastColon = prefix.LastIndexOf(':', exclamationMark);
+        int nickStart = lastColon != -1 ? lastColon + 1 : 0;
+        if (nickStart >= exclamationMark)
+        {
+            return;
+        }
+
+        string username = prefix[nickStart..exclamationMark];
         string text = message.Substring(messageStart + 2);
 
         try
