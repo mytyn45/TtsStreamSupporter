@@ -19,14 +19,26 @@ public class SpeechPlayerService
 
     private WaveOutEvent? _waveOut;
 
-    // ДОБАВИТЬ ЭТО:
     private readonly AsyncRateLimiter _nttsRateLimiter = new();
 
-    private static readonly HttpClient _nttsHttpClient = new()
-    {
-        BaseAddress = new Uri("https://nttsfuckrkn.fdev.team"),
-        Timeout = TimeSpan.FromSeconds(20)
-    };
+    private const int MaxConsecutiveFailuresBeforeSwitch = 3;
+    private readonly object _nttsServerLock = new();
+    private int _activeServerIndex = 0;
+    private int _consecutiveFailures = 0;
+
+    private static readonly HttpClient[] _nttsHttpClients =
+    [
+        new()
+        {
+            BaseAddress = new Uri("https://nttsfuckrkn.fdev.team"),
+            Timeout = TimeSpan.FromSeconds(15)
+        },
+        new()
+        {
+            BaseAddress = new Uri("https://ntts.fdev.team"),
+            Timeout = TimeSpan.FromSeconds(15)
+        }
+    ];
 
     public SpeechPlayerService(SettingsService settings)
     {
@@ -150,6 +162,94 @@ public class SpeechPlayerService
                 "NTTS API токен не задан в настройках.");
         }
 
+        var minInterval = _settings.Settings.TtsDelayEnabled
+            ? TimeSpan.FromSeconds(_settings.Settings.TtsDelayTime)
+            : TimeSpan.Zero;
+
+        await _nttsRateLimiter.WaitTurnAsync(minInterval);
+
+        HttpClient primaryClient;
+        HttpClient backupClient;
+
+        lock (_nttsServerLock)
+        {
+            primaryClient = _nttsHttpClients[_activeServerIndex];
+            backupClient = _nttsHttpClients[1 - _activeServerIndex];
+        }
+
+        string primaryHost = primaryClient.BaseAddress?.ToString() ?? "primary";
+        string backupHost = backupClient.BaseAddress?.ToString() ?? "backup";
+
+        // 1. Пробуем текущий активный сервер
+        try
+        {
+            byte[] bytes = await SendNttsRequestAsync(primaryClient, message, token);
+
+            lock (_nttsServerLock)
+            {
+                if (ReferenceEquals(_nttsHttpClients[_activeServerIndex], primaryClient))
+                {
+                    _consecutiveFailures = 0;
+                }
+            }
+
+            return new MemoryStream(bytes);
+        }
+        catch (Exception ex)
+        {
+            lock (_nttsServerLock)
+            {
+                if (ReferenceEquals(_nttsHttpClients[_activeServerIndex], primaryClient))
+                {
+                    _consecutiveFailures++;
+                    Log.Warning(
+                        "Активный NTTS-сервер {Host} не ответил (попытка {Failures}/{Max}). Ошибка: {Error}",
+                        primaryHost,
+                        _consecutiveFailures,
+                        MaxConsecutiveFailuresBeforeSwitch,
+                        ex.Message);
+
+                    if (_consecutiveFailures >= MaxConsecutiveFailuresBeforeSwitch)
+                    {
+                        _activeServerIndex = 1 - _activeServerIndex;
+                        _consecutiveFailures = 0;
+                        Log.Warning(
+                            "NTTS: после {Max} неудачных попыток подряд активный сервер переключён на {NewHost}",
+                            MaxConsecutiveFailuresBeforeSwitch,
+                            backupHost);
+                    }
+                }
+            }
+        }
+
+        // 2. Если основной сервер промолчал или дал сбой — каждый раз пробуем запасной сервер с тем же запросом
+        Log.Information("Пробуем запасной NTTS-сервер {Host}...", backupHost);
+
+        try
+        {
+            byte[] backupBytes = await SendNttsRequestAsync(backupClient, message, token);
+
+            Log.Information("Запасной NTTS-сервер {Host} успешно обработал запрос.", backupHost);
+
+            return new MemoryStream(backupBytes);
+        }
+        catch (Exception backupEx)
+        {
+            Log.Error(
+                backupEx,
+                "Не удалось получить аудио ни с одного NTTS-сервера ({PrimaryHost}, {BackupHost}).",
+                primaryHost,
+                backupHost);
+
+            throw;
+        }
+    }
+
+    private static async Task<byte[]> SendNttsRequestAsync(
+        HttpClient client,
+        ProcessedTtsMessage message,
+        string token)
+    {
         var query = HttpUtility.ParseQueryString(string.Empty);
         query["speaker"] = message.VoiceName;
         query["text"] = message.Text;
@@ -161,19 +261,16 @@ public class SpeechPlayerService
         request.Headers.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-        // Ждём своей очереди, чтобы не превысить лимит запросов/сек
-        var minInterval = _settings.Settings.TtsDelayEnabled
-            ? TimeSpan.FromSeconds(_settings.Settings.TtsDelayTime)
-            : TimeSpan.Zero;
-
-        await _nttsRateLimiter.WaitTurnAsync(minInterval);
-
-        using var response = await _nttsHttpClient.SendAsync(request);
+        using var response = await client.SendAsync(request);
         response.EnsureSuccessStatusCode();
 
         byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+        if (bytes == null || bytes.Length == 0)
+        {
+            throw new InvalidOperationException("Сервер вернул пустой аудиопоток.");
+        }
 
-        return new MemoryStream(bytes);
+        return bytes;
     }
 
     /// <summary>
