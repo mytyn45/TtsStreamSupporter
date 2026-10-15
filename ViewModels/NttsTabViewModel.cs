@@ -62,6 +62,34 @@ public class NttsTabViewModel : INotifyPropertyChanged
         }
     }
 
+    private bool _nttsUseFallbackServer;
+    public bool NttsUseFallbackServer
+    {
+        get => _nttsUseFallbackServer;
+        set
+        {
+            if (_nttsUseFallbackServer == value)
+                return;
+
+            _nttsUseFallbackServer = value;
+            _settings.Settings.NttsUseFallbackServer = value;
+            _ = _settings.DelayedSave();
+
+            if (_speechPlayerService != null)
+            {
+                _speechPlayerService.UseFallbackServer = value;
+            }
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CurrentServerStatus));
+        }
+    }
+
+    public string CurrentServerStatus =>
+        _nttsUseFallbackServer
+            ? "Активный сервер: ntts.fdev.team (запасной)"
+            : "Активный сервер: nttsfuckrkn.fdev.team (основной)";
+
     private string? _statusMessage;
     public string? StatusMessage
     {
@@ -75,18 +103,43 @@ public class NttsTabViewModel : INotifyPropertyChanged
     public ICommand OpenUrlCommand { get; }
 
     private readonly IndividualVoiceService? _individualVoiceService;
+    private readonly SpeechPlayerService? _speechPlayerService;
 
-    public NttsTabViewModel(SettingsService settings, IndividualVoiceService? individualVoiceService = null)
+    public NttsTabViewModel(
+        SettingsService settings,
+        SpeechPlayerService? speechPlayerService = null,
+        IndividualVoiceService? individualVoiceService = null)
     {
         _settings = settings;
+        _speechPlayerService = speechPlayerService;
         _individualVoiceService = individualVoiceService;
         _nttsApi = _settings.Settings.NttsApi;
         _nttsVoiceChangeCommand = _settings.Settings.NttsVoiceChangeCommand;
         _checkBoxNttsVoicesIsEnabled = _settings.Settings.CheckBoxNttsVoicesIsEnabled;
+        _nttsUseFallbackServer = _settings.Settings.NttsUseFallbackServer;
+
+        if (_speechPlayerService != null)
+        {
+            _speechPlayerService.ActiveServerChanged += OnActiveServerChanged;
+        }
+
         ButtonLoadVoices = new RelayCommand(LoadVoices);
         OpenUrlCommand = new RelayCommand<string>(OpenUrl);
 
         LoadLocalVoicesIfAvailable();
+    }
+
+    private void OnActiveServerChanged(bool isFallback)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (_nttsUseFallbackServer != isFallback)
+            {
+                _nttsUseFallbackServer = isFallback;
+                OnPropertyChanged(nameof(NttsUseFallbackServer));
+                OnPropertyChanged(nameof(CurrentServerStatus));
+            }
+        });
     }
 
     private void LoadLocalVoicesIfAvailable()
@@ -131,8 +184,11 @@ public class NttsTabViewModel : INotifyPropertyChanged
                 Timeout = TimeSpan.FromSeconds(30)
             };
 
-            var response = await client.GetAsync(
-                "https://nttsfuckrkn.fdev.team/api/v1/tts/speakers");
+            string serverUrl = _nttsUseFallbackServer
+                ? "https://ntts.fdev.team/api/v1/tts/speakers"
+                : "https://nttsfuckrkn.fdev.team/api/v1/tts/speakers";
+
+            var response = await client.GetAsync(serverUrl);
 
             response.EnsureSuccessStatusCode();
 

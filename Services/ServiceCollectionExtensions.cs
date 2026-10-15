@@ -15,10 +15,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<TtsTabViewModel>();
         services.AddSingleton<LogsTabViewModel>();
         services.AddSingleton<IndividualVoicesTabViewModel>();
+        services.AddSingleton<SpeechPlayerService>();
         services.AddSingleton<NttsTabViewModel>();
         services.AddSingleton<TtsMessageProcessing>();
         services.AddSingleton<MessageQueue>();
-        services.AddSingleton<SpeechPlayerService>();
         services.AddSingleton<TwitchConnection>();
         services.AddSingleton<GoodgameConnection>();
         services.AddSingleton<NttsSpeakerLookupService>();

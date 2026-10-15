@@ -185,6 +185,7 @@ public class SettingsService
         public Dictionary<string, string> CharWordReplacements { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public List<IndividualVoiceSettings> IndividualVoices { get; set; } = new();
         public bool CheckBoxNttsVoicesIsEnabled { get; set; }
+        public bool NttsUseFallbackServer { get; set; }
         public bool TtsDelayEnabled { get; set; }
         public int TtsDelayTime { get; set; }
     }

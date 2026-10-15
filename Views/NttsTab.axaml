@@ -50,6 +50,15 @@
                         <CheckBox Content="Включить NTTS"
                                   IsChecked="{Binding CheckBoxNttsVoicesIsEnabled}"/>
 
+                        <StackPanel Spacing="2">
+                            <CheckBox Content="Использовать запасной сервер"
+                                      IsChecked="{Binding NttsUseFallbackServer}"
+                                      ToolTip.Tip="Основной сервер: nttsfuckrkn.fdev.team&#x0a;Запасной сервер: ntts.fdev.team"/>
+                            <TextBlock Text="{Binding CurrentServerStatus}"
+                                       FontSize="11"
+                                       Foreground="Gray"/>
+                        </StackPanel>
+
                         <StackPanel Spacing="4">
                             <Label Content="API ключ"
                                    Padding="0"/>
