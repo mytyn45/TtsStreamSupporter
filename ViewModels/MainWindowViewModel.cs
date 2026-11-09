@@ -1,15 +1,46 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
-using System.Runtime.CompilerServices;
+using CommunityToolkit.Mvvm.ComponentModel;
 using TtsStreamSupporter.Models;
 using TtsStreamSupporter.Services;
 
 namespace TtsStreamSupporter.ViewModels;
 
-public class MainWindowViewModel : INotifyPropertyChanged
+public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly SettingsService _settings;
+
+    public ConnectionsTabViewModel ConnectionsTab { get; }
+    public TtsTabViewModel TtsTab { get; }
+    public IndividualVoicesTabViewModel IndividualVoicesTab { get; }
+    public LogsTabViewModel LogsTab { get; }
+    public NttsTabViewModel NttsTab { get; }
+
+    // Подключения для отображения в правой нижней части MainWindow
+    public ObservableCollection<ConnectionStatus> Connections => ConnectionsTab.Connections;
+
+    public ObservableCollection<AppWarningViewModel> ActiveWarnings { get; } = new();
+
+    [ObservableProperty]
+    private string _statusText = "Кнопка ещё не нажата";
+
+    [ObservableProperty]
+    private bool _individualVoicesEnabled;
+
+    public bool CheckBoxNttsVoicesIsEnabled
+    {
+        get => NttsTab.CheckBoxNttsVoicesIsEnabled;
+        set
+        {
+            if (NttsTab.CheckBoxNttsVoicesIsEnabled != value)
+            {
+                NttsTab.CheckBoxNttsVoicesIsEnabled = value;
+                OnPropertyChanged();
+                UpdateWarnings();
+            }
+        }
+    }
 
     public MainWindowViewModel(
         SettingsService settings,
@@ -18,12 +49,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         IndividualVoicesTabViewModel individualVoicesTab,
         LogsTabViewModel logsTab,
         NttsTabViewModel nttsTab,
-        TtsMessageProcessing ttsMessageProcessor,
-        MessageQueue msqQueue,
-        SpeechPlayerService speechPlayerService,
-        TwitchConnection twitchConnection,
-        GoodgameConnection goodgameConnection,
-        BluestarConnection bluestarConnection)
+        IChatRouterService chatRouterService)
     {
         _settings = settings;
 
@@ -32,16 +58,13 @@ public class MainWindowViewModel : INotifyPropertyChanged
         IndividualVoicesTab = individualVoicesTab;
         LogsTab = logsTab;
         NttsTab = nttsTab;
-        TtsMessageProcess = ttsMessageProcessor;
-        MessageQueue = msqQueue;
-        SpeechPlayerSerive = speechPlayerService;
-        TwitchConnection = twitchConnection;
-        GoodgameConnection = goodgameConnection;
-        BluestarConnection = bluestarConnection;
 
-        _individualVoicesEnabled =
-            _settings.Settings.IndividualVoicesEnabled;
+        // Запуск фоновой маршрутизации сообщений чата
+        chatRouterService.Initialize();
 
+        _individualVoicesEnabled = _settings.Settings.IndividualVoicesEnabled;
+
+        // Отслеживание изменений NTTS таба
         NttsTab.PropertyChanged += (sender, args) =>
         {
             if (args.PropertyName == nameof(NttsTab.CheckBoxNttsVoicesIsEnabled))
@@ -55,6 +78,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
             }
         };
 
+        // Отслеживание изменений TTS таба
         TtsTab.PropertyChanged += (sender, args) =>
         {
             if (args.PropertyName == nameof(TtsTab.ComboBoxSelectedItemInstalledVoices) ||
@@ -64,6 +88,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
             }
         };
 
+        // Отслеживание изменений индивидуальных голосов
         void SubscribeVoice(IndividualVoiceSettings v)
         {
             v.PropertyChanged += (s, e) =>
@@ -95,43 +120,11 @@ public class MainWindowViewModel : INotifyPropertyChanged
         UpdateWarnings();
     }
 
-    private string _statusText = "Кнопка ещё не нажата";
-    private bool _individualVoicesEnabled;
-
-    public ObservableCollection<AppWarning> ActiveWarnings { get; } = new();
-
-    public bool IndividualVoicesEnabled
+    partial void OnIndividualVoicesEnabledChanged(bool value)
     {
-        get => _individualVoicesEnabled;
-
-        set
-        {
-            if (_individualVoicesEnabled == value)
-                return;
-
-            _individualVoicesEnabled = value;
-
-            OnPropertyChanged();
-
-            _settings.Settings.IndividualVoicesEnabled = value;
-            _ = _settings.DelayedSave();
-            UpdateWarnings();
-        }
-    }
-
-    public bool CheckBoxNttsVoicesIsEnabled
-    {
-        get => NttsTab.CheckBoxNttsVoicesIsEnabled;
-
-        set
-        {
-            if (NttsTab.CheckBoxNttsVoicesIsEnabled == value)
-                return;
-
-            NttsTab.CheckBoxNttsVoicesIsEnabled = value;
-            OnPropertyChanged();
-            UpdateWarnings();
-        }
+        _settings.Settings.IndividualVoicesEnabled = value;
+        _ = _settings.DelayedSave();
+        UpdateWarnings();
     }
 
     private void UpdateWarnings()
@@ -144,15 +137,15 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
         if (voiceMissing && volumeZero)
         {
-            ActiveWarnings.Add(new AppWarning("Одиночный голос не выбран, громкость 0", "#D32F2F"));
+            ActiveWarnings.Add(new AppWarningViewModel("Одиночный голос не выбран, громкость 0", "#D32F2F"));
         }
         else if (voiceMissing)
         {
-            ActiveWarnings.Add(new AppWarning("Одиночный голос не выбран", "#E65100"));
+            ActiveWarnings.Add(new AppWarningViewModel("Одиночный голос не выбран", "#E65100"));
         }
         else if (volumeZero)
         {
-            ActiveWarnings.Add(new AppWarning("Громкость одиночного голоса равна 0", "#E65100"));
+            ActiveWarnings.Add(new AppWarningViewModel("Громкость одиночного голоса равна 0", "#E65100"));
         }
 
         // 2. Индивидуальные голоса: включены, но ни один не выбран
@@ -161,7 +154,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
             bool anyEnabled = IndividualVoicesTab.IndividualVoices.Any(v => v.IsEnabled);
             if (!anyEnabled)
             {
-                ActiveWarnings.Add(new AppWarning("Включены индивидуальные голоса, но ни один не выбран", "#D32F2F"));
+                ActiveWarnings.Add(new AppWarningViewModel("Включены индивидуальные голоса, но ни один не выбран", "#D32F2F"));
             }
         }
 
@@ -170,52 +163,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
         {
             if (string.IsNullOrWhiteSpace(NttsTab.NttsApi))
             {
-                ActiveWarnings.Add(new AppWarning("Включены NTTS голоса, но не указан API-ключ", "#D32F2F"));
+                ActiveWarnings.Add(new AppWarningViewModel("Включены NTTS голоса, но не указан API-ключ", "#D32F2F"));
             }
         }
-    }
-
-    public string StatusText
-    {
-        get => _statusText;
-
-        set
-        {
-            if (_statusText == value)
-                return;
-
-            _statusText = value;
-
-            OnPropertyChanged();
-        }
-    }
-
-    public ConnectionsTabViewModel ConnectionsTab { get; }
-    public TtsTabViewModel TtsTab { get; }
-    public LogsTabViewModel LogsTab { get; }
-    public IndividualVoicesTabViewModel IndividualVoicesTab { get; }
-    public NttsTabViewModel NttsTab { get; }
-    public TtsMessageProcessing TtsMessageProcess { get; }
-    public MessageQueue MessageQueue { get; }
-    public SpeechPlayerService SpeechPlayerSerive { get; }
-    public TwitchConnection TwitchConnection { get; }
-    public GoodgameConnection GoodgameConnection { get; }
-    public BluestarConnection BluestarConnection { get; }
-
-    // Подключения для отображения в MainWindow
-    public ObservableCollection<ConnectionStatus> Connections =>
-        ConnectionsTab.Connections;
-
-    public ObservableCollection<string> BlacklistedUsers { get; }
-        = new();
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    protected void OnPropertyChanged(
-        [CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(
-            this,
-            new PropertyChangedEventArgs(propertyName));
     }
 }

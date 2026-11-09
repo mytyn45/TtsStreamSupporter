@@ -517,10 +517,12 @@ public class IndividualVoiceService
     // ============================================
 
     private static string CreateUserKey(
-        string username,
-        string platform)
+        string? username,
+        string? platform)
     {
-        return $"{platform.Trim().ToLowerInvariant()}:{username.Trim().ToLowerInvariant()}";
+        var p = string.IsNullOrWhiteSpace(platform) ? "unknown" : platform.Trim().ToLowerInvariant();
+        var u = string.IsNullOrWhiteSpace(username) ? "anonymous" : username.Trim().ToLowerInvariant();
+        return $"{p}:{u}";
     }
 
     /// <summary>

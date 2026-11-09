@@ -1,64 +1,87 @@
 using System;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using System.Windows.Input;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using TtsStreamSupporter.Services;
 
 namespace TtsStreamSupporter.ViewModels;
 
-public class ConnectionsTabViewModel : INotifyPropertyChanged, IDisposable
+public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
 {
     private readonly SettingsService _settings;
-    private readonly TtsMessageProcessing _ttsProcessor;
-    private readonly MessageQueue _messageQueue;
-
     private readonly TwitchConnection _twitchConnection;
     private readonly GoodgameConnection _goodgameConnection;
+    private readonly KickConnection _kickConnection;
     private readonly BluestarConnection _bluestarConnection;
 
     private bool _isBusy;
 
     public ObservableCollection<ConnectionStatus> Connections { get; } = new();
 
+    [ObservableProperty]
+    private string? _twitchNick = "";
+
+    [ObservableProperty]
+    private bool _checkboxConnectToTwitch;
+
+    [ObservableProperty]
+    private string? _goodgameNick = "";
+
+    [ObservableProperty]
+    private bool _checkboxConnectToGoodgame;
+
+    [ObservableProperty]
+    private string? _kickNick = "";
+
+    [ObservableProperty]
+    private bool _checkboxConnectToKick;
+
+    [ObservableProperty]
+    private string? _bluestarApi = "";
+
+    [ObservableProperty]
+    private bool _checkboxConnectToBluestar;
+
+    [ObservableProperty]
+    private bool _ttsDelayEnabled;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TtsDelayLabelDisplay))]
+    private int _ttsDelayTime;
+
+    public string TtsDelayLabelDisplay => $"{TtsDelayTime}с";
+
     public ConnectionsTabViewModel(
         SettingsService settings,
-        TtsMessageProcessing ttsProcessor,
-        MessageQueue messageQueue,
         TwitchConnection twitchConnection,
         GoodgameConnection goodgameConnection,
+        KickConnection kickConnection,
         BluestarConnection bluestarConnection)
     {
         _settings = settings;
-        _ttsProcessor = ttsProcessor;
-        _messageQueue = messageQueue;
-
         _twitchConnection = twitchConnection;
         _goodgameConnection = goodgameConnection;
+        _kickConnection = kickConnection;
         _bluestarConnection = bluestarConnection;
 
-        // Сообщения
-        _twitchConnection.MessageReceived += OnChatMessageReceived;
-        _goodgameConnection.MessageReceived += OnChatMessageReceived;
-        _bluestarConnection.MessageReceived += OnChatMessageReceived;
-
-        // Состояния подключений
+        // Инициализация статусов подключений
         SubscribeConnection("Twitch", _twitchConnection);
         SubscribeConnection("GoodGame", _goodgameConnection);
+        SubscribeConnection("Kick", _kickConnection);
         SubscribeConnection("Bluestar", _bluestarConnection);
 
-        ButtonConnectToChats = new RelayCommand(Connect);
-        ButtonReconnectToChats = new RelayCommand(Reconnect);
-
-        // Settings
+        // Загрузка настроек
         _twitchNick = _settings.Settings.TwitchNick;
         _checkboxConnectToTwitch = _settings.Settings.CheckboxConnectToTwitch;
 
         _goodgameNick = _settings.Settings.GoodgameNick;
         _checkboxConnectToGoodgame = _settings.Settings.CheckboxConnectToGoodgame;
+
+        _kickNick = _settings.Settings.KickNick;
+        _checkboxConnectToKick = _settings.Settings.CheckboxConnectToKick;
 
         _bluestarApi = _settings.Settings.BluestarApi;
         _checkboxConnectToBluestar = _settings.Settings.CheckboxConnectToBluestar;
@@ -66,22 +89,6 @@ public class ConnectionsTabViewModel : INotifyPropertyChanged, IDisposable
         _ttsDelayEnabled = _settings.Settings.TtsDelayEnabled;
         _ttsDelayTime = _settings.Settings.TtsDelayTime;
     }
-
-    private string? _twitchNick = "";
-    private bool _checkboxConnectToTwitch;
-
-    private string? _goodgameNick = "";
-    private bool _checkboxConnectToGoodgame;
-
-    private string? _bluestarApi = "";
-    private bool _checkboxConnectToBluestar;
-
-    private bool _ttsDelayEnabled;
-    private int _ttsDelayTime;
-
-    // =========================================================
-    // CONNECTIONS
-    // =========================================================
 
     private void SubscribeConnection(string name, ConnectionBase connection)
     {
@@ -91,171 +98,76 @@ public class ConnectionsTabViewModel : INotifyPropertyChanged, IDisposable
         connection.StateChanged += state => OnConnectionStateChanged(status, state);
     }
 
-    private void OnConnectionStateChanged(ConnectionStatus status, ConnectionState state)
+    private static void OnConnectionStateChanged(ConnectionStatus status, ConnectionState state)
     {
-        // События приходят из сетевых потоков, UI обновляем в UI-потоке
         if (Dispatcher.UIThread.CheckAccess())
             status.UpdateState(state);
         else
             Dispatcher.UIThread.Post(() => status.UpdateState(state));
     }
 
-    // =========================================================
-    // TWITCH
-    // =========================================================
-
-    public string? TwitchNick
+    partial void OnTwitchNickChanged(string? value)
     {
-        get => _twitchNick;
-        set
-        {
-            if (_twitchNick == value)
-                return;
-
-            _twitchNick = value;
-            OnPropertyChanged();
-
-            _settings.Settings.TwitchNick = value;
-            _ = _settings.DelayedSave();
-        }
+        _settings.Settings.TwitchNick = value;
+        _ = _settings.DelayedSave();
     }
 
-    public bool CheckboxConnectToTwitch
+    partial void OnCheckboxConnectToTwitchChanged(bool value)
     {
-        get => _checkboxConnectToTwitch;
-        set
-        {
-            if (_checkboxConnectToTwitch == value)
-                return;
-
-            _checkboxConnectToTwitch = value;
-            OnPropertyChanged();
-
-            _settings.Settings.CheckboxConnectToTwitch = value;
-            _ = _settings.DelayedSave();
-        }
+        _settings.Settings.CheckboxConnectToTwitch = value;
+        _ = _settings.DelayedSave();
     }
 
-    // =========================================================
-    // GOODGAME
-    // =========================================================
-
-    public string? GoodgameNick
+    partial void OnGoodgameNickChanged(string? value)
     {
-        get => _goodgameNick;
-        set
-        {
-            if (_goodgameNick == value)
-                return;
-
-            _goodgameNick = value;
-            OnPropertyChanged();
-
-            _settings.Settings.GoodgameNick = value;
-            _ = _settings.DelayedSave();
-        }
+        _settings.Settings.GoodgameNick = value ?? "";
+        _ = _settings.DelayedSave();
     }
 
-    public bool CheckboxConnectToGoodgame
+    partial void OnCheckboxConnectToGoodgameChanged(bool value)
     {
-        get => _checkboxConnectToGoodgame;
-        set
-        {
-            if (_checkboxConnectToGoodgame == value)
-                return;
-
-            _checkboxConnectToGoodgame = value;
-            OnPropertyChanged();
-
-            _settings.Settings.CheckboxConnectToGoodgame = value;
-            _ = _settings.DelayedSave();
-        }
+        _settings.Settings.CheckboxConnectToGoodgame = value;
+        _ = _settings.DelayedSave();
     }
 
-    // =========================================================
-    // BLUESTAR
-    // =========================================================
-
-    public string? BluestarApi
+    partial void OnKickNickChanged(string? value)
     {
-        get => _bluestarApi;
-        set
-        {
-            if (_bluestarApi == value)
-                return;
-
-            _bluestarApi = value;
-            OnPropertyChanged();
-
-            _settings.Settings.BluestarApi = value;
-            _ = _settings.DelayedSave();
-        }
+        _settings.Settings.KickNick = value;
+        _ = _settings.DelayedSave();
     }
 
-    public bool CheckboxConnectToBluestar
+    partial void OnCheckboxConnectToKickChanged(bool value)
     {
-        get => _checkboxConnectToBluestar;
-        set
-        {
-            if (_checkboxConnectToBluestar == value)
-                return;
-
-            _checkboxConnectToBluestar = value;
-            OnPropertyChanged();
-
-            _settings.Settings.CheckboxConnectToBluestar = value;
-            _ = _settings.DelayedSave();
-        }
+        _settings.Settings.CheckboxConnectToKick = value;
+        _ = _settings.DelayedSave();
     }
 
-    // =========================================================
-    // TTS DELAY
-    // =========================================================
-
-    public bool TtsDelayEnabled
+    partial void OnBluestarApiChanged(string? value)
     {
-        get => _ttsDelayEnabled;
-        set
-        {
-            if (_ttsDelayEnabled == value)
-                return;
-
-            _ttsDelayEnabled = value;
-            OnPropertyChanged();
-
-            _settings.Settings.TtsDelayEnabled = value;
-            _ = _settings.DelayedSave();
-        }
+        _settings.Settings.BluestarApi = value;
+        _ = _settings.DelayedSave();
     }
 
-    public int TtsDelayTime
+    partial void OnCheckboxConnectToBluestarChanged(bool value)
     {
-        get => _ttsDelayTime;
-        set
-        {
-            if (_ttsDelayTime == value)
-                return;
-
-            _ttsDelayTime = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(TtsDelayLabelDisplay));
-
-            _settings.Settings.TtsDelayTime = value;
-            _ = _settings.DelayedSave();
-        }
+        _settings.Settings.CheckboxConnectToBluestar = value;
+        _ = _settings.DelayedSave();
     }
 
-    // Вычисляемая метка, например "5с"
-    public string TtsDelayLabelDisplay => $"{TtsDelayTime}с";
+    partial void OnTtsDelayEnabledChanged(bool value)
+    {
+        _settings.Settings.TtsDelayEnabled = value;
+        _ = _settings.DelayedSave();
+    }
 
-    // =========================================================
-    // CONNECT
-    // =========================================================
+    partial void OnTtsDelayTimeChanged(int value)
+    {
+        _settings.Settings.TtsDelayTime = value;
+        _ = _settings.DelayedSave();
+    }
 
-    public ICommand ButtonConnectToChats { get; }
-    public ICommand ButtonReconnectToChats { get; }
-
-    private async void Connect()
+    [RelayCommand]
+    public async Task ConnectToChatsAsync()
     {
         if (_isBusy)
             return;
@@ -275,6 +187,12 @@ public class ConnectionsTabViewModel : INotifyPropertyChanged, IDisposable
                 await _goodgameConnection.ConnectAsync(GoodgameNick);
             }
 
+            if (CheckboxConnectToKick)
+            {
+                Log.Information("Подключение к Kick...");
+                await _kickConnection.ConnectAsync(KickNick);
+            }
+
             if (CheckboxConnectToBluestar)
             {
                 Log.Information("Подключение к Bluestar...");
@@ -291,7 +209,8 @@ public class ConnectionsTabViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private async void Reconnect()
+    [RelayCommand]
+    public async Task ReconnectToChatsAsync()
     {
         if (_isBusy)
             return;
@@ -321,6 +240,16 @@ public class ConnectionsTabViewModel : INotifyPropertyChanged, IDisposable
                 _goodgameConnection.Disconnect();
             }
 
+            if (CheckboxConnectToKick)
+            {
+                Log.Information("Переподключение к Kick...");
+                await _kickConnection.ReconnectAsync(KickNick);
+            }
+            else
+            {
+                _kickConnection.Disconnect();
+            }
+
             if (CheckboxConnectToBluestar)
             {
                 Log.Information("Переподключение к Bluestar...");
@@ -341,66 +270,11 @@ public class ConnectionsTabViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    // =========================================================
-    // CHAT MESSAGES
-    // =========================================================
-
-    private async void OnChatMessageReceived(ChatMessageReceived message)
-    {
-        try
-        {
-            var result = await _ttsProcessor.ProcessIncomingMessage(
-                message.Username,
-                message.VoiceName,
-                message.Message,
-                message.Platform);
-
-            switch (result.Status)
-            {
-                case TtsProcessStatus.Success:
-                    _messageQueue.Enqueue(result.Message!);
-                    break;
-
-                case TtsProcessStatus.Skipped:
-                case TtsProcessStatus.Blacklisted:
-                case TtsProcessStatus.Filtered:
-                    // штатные сценарии, ошибкой логировать не нужно
-                    break;
-
-                case TtsProcessStatus.Empty:
-                    Log.Debug("Сообщение пришло пустым");
-                    break;
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(
-                ex,
-                "Ошибка при обработке сообщения от {User} ({Platform})",
-                message.Username,
-                message.Platform);
-        }
-    }
-
-    // =========================================================
-    // DISPOSE
-    // =========================================================
+    // Алиасы для привязок XAML: ButtonConnectToChats, ButtonReconnectToChats
+    public IAsyncRelayCommand ButtonConnectToChats => ConnectToChatsCommand;
+    public IAsyncRelayCommand ButtonReconnectToChats => ReconnectToChatsCommand;
 
     public void Dispose()
     {
-        _twitchConnection.MessageReceived -= OnChatMessageReceived;
-        _goodgameConnection.MessageReceived -= OnChatMessageReceived;
-        _bluestarConnection.MessageReceived -= OnChatMessageReceived;
-    }
-
-    // =========================================================
-    // PROPERTY CHANGED
-    // =========================================================
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

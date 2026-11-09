@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using NickBuhro.Translit;
+using Serilog;
 using TtsStreamSupporter.Models;
 using TtsStreamSupporter.ViewModels;
 
@@ -228,6 +231,15 @@ public class TtsMessageProcessing
         }
 
         // ==============================
+        // ФИЛЬТР МАТА (BadWordFilter)
+        // ==============================
+
+        if (_settings.Settings.BadWordFilter)
+        {
+            processedMessage = FilterBadWords(processedMessage);
+        }
+
+        // ==============================
         // ТРАНСЛИТЕРАЦИЯ И ЗАМЕНА СИМВОЛОВ
         // ==============================
 
@@ -341,5 +353,130 @@ public class TtsMessageProcessing
         }
 
         return false;
+    }
+
+    private static bool _badWordFilterInitialized;
+    private static readonly object _badWordFilterLock = new();
+
+    private static void EnsureBadWordFilterInitialized()
+    {
+        if (_badWordFilterInitialized) return;
+        lock (_badWordFilterLock)
+        {
+            if (_badWordFilterInitialized) return;
+
+            try
+            {
+                var filter = BogaNet.BWF.Filter.BadWordFilter.Instance;
+                if (!filter.IsLoaded)
+                {
+                    string baseDir = AppContext.BaseDirectory;
+                    var filesToLoad = new List<Tuple<string, string>>();
+
+                    foreach (var tuple in BogaNet.BWF.BWFConstants.BWF_LTR)
+                    {
+                        string lang = tuple.Item1;
+                        string relPath = tuple.Item2;
+                        string cleanRel = relPath.TrimStart('.', '/', '\\');
+                        string fullPath = Path.Combine(baseDir, cleanRel);
+
+                        if (File.Exists(fullPath))
+                        {
+                            filesToLoad.Add(Tuple.Create(lang, fullPath));
+                        }
+                    }
+
+                    if (filesToLoad.Count > 0)
+                    {
+                        filter.LoadFiles(true, filesToLoad.ToArray());
+                    }
+                    else
+                    {
+                        filter.LoadFiles(true, BogaNet.BWF.BWFConstants.BWF_LTR);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Ошибка инициализации фильтра мата BadWordFilter");
+            }
+            finally
+            {
+                _badWordFilterInitialized = true;
+            }
+        }
+    }
+
+    private static readonly System.Reflection.FieldInfo? BadwordsRegexField =
+        typeof(BogaNet.BWF.Filter.BadWordFilter).GetField("_exactBadwordsRegex",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+    private static string ReplaceBadWords(BogaNet.BWF.Filter.BadWordFilter filter, string text, string replacement)
+    {
+        if (BadwordsRegexField?.GetValue(filter) is Dictionary<string, Regex> regexDict && regexDict.Count > 0)
+        {
+            string result = text;
+            foreach (var regex in regexDict.Values)
+            {
+                result = regex.Replace(result, replacement);
+            }
+            return result;
+        }
+
+        return filter.ReplaceAll(text);
+    }
+
+    private string FilterBadWords(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return text;
+
+        try
+        {
+            EnsureBadWordFilterInitialized();
+
+            var filter = BogaNet.BWF.Filter.BadWordFilter.Instance;
+            if (!filter.IsLoaded && filter.Count == 0)
+                return text;
+
+            var placeholders = new Dictionary<string, string>();
+            string textToFilter = text;
+
+            if (_settings.Settings.BadWordFilterWhitelist is { Count: > 0 } whitelist)
+            {
+                int tokenIndex = 0;
+                foreach (var exemptWord in whitelist)
+                {
+                    if (string.IsNullOrWhiteSpace(exemptWord))
+                        continue;
+
+                    string pattern = @"(?<![\p{L}\p{Nd}_])" + Regex.Escape(exemptWord.Trim()) + @"(?![\p{L}\p{Nd}_])";
+                    textToFilter = Regex.Replace(textToFilter, pattern, match =>
+                    {
+                        string placeholder = $"__BWF_SAFE_{tokenIndex++}__";
+                        placeholders[placeholder] = match.Value;
+                        return placeholder;
+                    }, RegexOptions.IgnoreCase);
+                }
+            }
+
+            string replacement = _settings.Settings.BadWordReplacement ?? "***";
+            string filtered = ReplaceBadWords(filter, textToFilter, replacement);
+
+            if (placeholders.Count > 0)
+            {
+                foreach (var kvp in placeholders)
+                {
+                    filtered = filtered.Replace(kvp.Key, kvp.Value);
+                }
+            }
+
+            return filtered;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Ошибка при фильтрации мата");
+            return text;
+        }
     }
 }

@@ -9,23 +9,30 @@ public static class ServiceCollectionExtensions
     public static ServiceProvider BuildServices()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<SettingsService>();
 
+        // Сервисы ядра и настроек
+        services.AddSingleton<SettingsService>();
+        services.AddSingleton<IVoiceDiscoveryService, VoiceDiscoveryService>();
+        services.AddSingleton<SpeechPlayerService>();
+        services.AddSingleton<MessageQueue>();
+        services.AddSingleton<NttsSpeakerLookupService>();
+        services.AddSingleton<IndividualVoiceService>();
+        services.AddSingleton<TtsMessageProcessing>();
+
+        // Сетевые подключения
+        services.AddSingleton<TwitchConnection>();
+        services.AddSingleton<GoodgameConnection>();
+        services.AddSingleton<KickConnection>();
+        services.AddSingleton<BluestarConnection>();
+        services.AddSingleton<IChatRouterService, ChatRouterService>();
+
+        // ViewModels
         services.AddSingleton<ConnectionsTabViewModel>();
         services.AddSingleton<TtsTabViewModel>();
         services.AddSingleton<LogsTabViewModel>();
         services.AddSingleton<IndividualVoicesTabViewModel>();
-        services.AddSingleton<SpeechPlayerService>();
         services.AddSingleton<NttsTabViewModel>();
-        services.AddSingleton<TtsMessageProcessing>();
-        services.AddSingleton<MessageQueue>();
-        services.AddSingleton<TwitchConnection>();
-        services.AddSingleton<GoodgameConnection>();
-        services.AddSingleton<NttsSpeakerLookupService>();
-        services.AddSingleton<IndividualVoiceService>();
         services.AddSingleton<MainWindowViewModel>();
-        services.AddSingleton<BluestarConnection>();
-        services.AddSingleton<AppServices>();
 
         return services.BuildServiceProvider();
     }

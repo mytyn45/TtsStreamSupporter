@@ -1,109 +1,46 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Input;
-using System.Diagnostics;
+using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using TtsStreamSupporter.Models;
 using TtsStreamSupporter.Services;
 using TtsStreamSupporter.Settings;
 
 namespace TtsStreamSupporter.ViewModels;
 
-public class NttsTabViewModel : INotifyPropertyChanged
+public partial class NttsTabViewModel : ViewModelBase
 {
-    public event PropertyChangedEventHandler? PropertyChanged;
     private readonly SettingsService _settings;
-    private bool _checkBoxNttsVoicesIsEnabled;
-    public bool CheckBoxNttsVoicesIsEnabled
-    {
-        get => _checkBoxNttsVoicesIsEnabled;
-        set
-        {
-            _checkBoxNttsVoicesIsEnabled = value;
-            _settings.Settings.CheckBoxNttsVoicesIsEnabled = value;
-            OnPropertyChanged();
-            _settings.DelayedSave();
-        }
-    }
-    private string? _nttsApi;
-    public string NttsApi
-    {
-        get => _nttsApi;
-        set
-        {
-            _nttsApi = value;
-            _settings.Settings.NttsApi = value;
-            OnPropertyChanged();
-            _ = _settings.DelayedSave();
-        }
-    }
-
-    private string _nttsVoiceChangeCommand = "";
-    public string NttsVoiceChangeCommand
-    {
-        get => _nttsVoiceChangeCommand;
-        set
-        {
-            if (_nttsVoiceChangeCommand == value)
-                return;
-
-            _nttsVoiceChangeCommand = value;
-            _settings.Settings.NttsVoiceChangeCommand = value;
-            OnPropertyChanged();
-            _ = _settings.DelayedSave();
-        }
-    }
-
-    private bool _nttsUseFallbackServer;
-    public bool NttsUseFallbackServer
-    {
-        get => _nttsUseFallbackServer;
-        set
-        {
-            if (_nttsUseFallbackServer == value)
-                return;
-
-            _nttsUseFallbackServer = value;
-            _settings.Settings.NttsUseFallbackServer = value;
-            _ = _settings.DelayedSave();
-
-            if (_speechPlayerService != null)
-            {
-                _speechPlayerService.UseFallbackServer = value;
-            }
-
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(CurrentServerStatus));
-        }
-    }
-
-    public string CurrentServerStatus =>
-        _nttsUseFallbackServer
-            ? "Активный сервер: ntts.fdev.team (запасной)"
-            : "Активный сервер: nttsfuckrkn.fdev.team (основной)";
-
-    private string? _statusMessage;
-    public string? StatusMessage
-    {
-        get => _statusMessage;
-        set { _statusMessage = value; OnPropertyChanged(); }
-    }
-
-    public ObservableCollection<Voice> Voices { get; set; } = new ObservableCollection<Voice>();
-
-    public ICommand ButtonLoadVoices { get; }
-    public ICommand OpenUrlCommand { get; }
-
-    private readonly IndividualVoiceService? _individualVoiceService;
     private readonly SpeechPlayerService? _speechPlayerService;
+    private readonly IndividualVoiceService? _individualVoiceService;
+
+    [ObservableProperty]
+    private bool _checkBoxNttsVoicesIsEnabled;
+
+    [ObservableProperty]
+    private string? _nttsApi = "";
+
+    [ObservableProperty]
+    private string _nttsVoiceChangeCommand = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CurrentServerStatus))]
+    private bool _nttsUseFallbackServer;
+
+    public string CurrentServerStatus => NttsUseFallbackServer
+        ? "Активный сервер: ntts.fdev.team (запасной)"
+        : "Активный сервер: nttsfuckrkn.fdev.team (основной)";
+
+    [ObservableProperty]
+    private string? _statusMessage;
+
+    public ObservableCollection<NttsVoiceCatalogEntry> Voices { get; } = new();
 
     public NttsTabViewModel(
         SettingsService settings,
@@ -113,6 +50,7 @@ public class NttsTabViewModel : INotifyPropertyChanged
         _settings = settings;
         _speechPlayerService = speechPlayerService;
         _individualVoiceService = individualVoiceService;
+
         _nttsApi = _settings.Settings.NttsApi;
         _nttsVoiceChangeCommand = _settings.Settings.NttsVoiceChangeCommand;
         _checkBoxNttsVoicesIsEnabled = _settings.Settings.CheckBoxNttsVoicesIsEnabled;
@@ -123,23 +61,47 @@ public class NttsTabViewModel : INotifyPropertyChanged
             _speechPlayerService.ActiveServerChanged += OnActiveServerChanged;
         }
 
-        ButtonLoadVoices = new RelayCommand(LoadVoices);
-        OpenUrlCommand = new RelayCommand<string>(OpenUrl);
-
         LoadLocalVoicesIfAvailable();
     }
 
     private void OnActiveServerChanged(bool isFallback)
     {
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        Dispatcher.UIThread.Post(() =>
         {
-            if (_nttsUseFallbackServer != isFallback)
+            if (NttsUseFallbackServer != isFallback)
             {
-                _nttsUseFallbackServer = isFallback;
-                OnPropertyChanged(nameof(NttsUseFallbackServer));
-                OnPropertyChanged(nameof(CurrentServerStatus));
+                NttsUseFallbackServer = isFallback;
             }
         });
+    }
+
+    partial void OnCheckBoxNttsVoicesIsEnabledChanged(bool value)
+    {
+        _settings.Settings.CheckBoxNttsVoicesIsEnabled = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnNttsApiChanged(string? value)
+    {
+        _settings.Settings.NttsApi = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnNttsVoiceChangeCommandChanged(string value)
+    {
+        _settings.Settings.NttsVoiceChangeCommand = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnNttsUseFallbackServerChanged(bool value)
+    {
+        _settings.Settings.NttsUseFallbackServer = value;
+        _ = _settings.DelayedSave();
+
+        if (_speechPlayerService != null)
+        {
+            _speechPlayerService.UseFallbackServer = value;
+        }
     }
 
     private void LoadLocalVoicesIfAvailable()
@@ -156,7 +118,7 @@ public class NttsTabViewModel : INotifyPropertyChanged
                 return;
 
             string json = File.ReadAllText(path);
-            var result = JsonSerializer.Deserialize<VoicesResponse>(
+            var result = JsonSerializer.Deserialize<NttsVoicesFile>(
                 json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -167,13 +129,17 @@ public class NttsTabViewModel : INotifyPropertyChanged
                     Voices.Add(voice);
                 foreach (var voice in result.CustomVoices)
                     Voices.Add(voice);
+
                 StatusMessage = $"Загружено локальных голосов: {Voices.Count}";
             }
         }
-        catch { }
+        catch
+        {
+        }
     }
 
-    private async void LoadVoices()
+    [RelayCommand]
+    public async Task LoadVoicesAsync()
     {
         try
         {
@@ -184,12 +150,11 @@ public class NttsTabViewModel : INotifyPropertyChanged
                 Timeout = TimeSpan.FromSeconds(30)
             };
 
-            string serverUrl = _nttsUseFallbackServer
+            string serverUrl = NttsUseFallbackServer
                 ? "https://ntts.fdev.team/api/v1/tts/speakers"
                 : "https://nttsfuckrkn.fdev.team/api/v1/tts/speakers";
 
             var response = await client.GetAsync(serverUrl);
-
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -210,9 +175,11 @@ public class NttsTabViewModel : INotifyPropertyChanged
 
                 _individualVoiceService?.ReloadNttsVoices();
             }
-            catch { }
+            catch
+            {
+            }
 
-            var result = JsonSerializer.Deserialize<VoicesResponse>(
+            var result = JsonSerializer.Deserialize<NttsVoicesFile>(
                 json,
                 new JsonSerializerOptions
                 {
@@ -249,6 +216,7 @@ public class NttsTabViewModel : INotifyPropertyChanged
         }
     }
 
+    [RelayCommand]
     private void OpenUrl(string? url)
     {
         if (string.IsNullOrWhiteSpace(url))
@@ -268,35 +236,6 @@ public class NttsTabViewModel : INotifyPropertyChanged
         }
     }
 
-    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-}
-
-public class VoicesResponse
-{
-    [JsonPropertyName("voices")]
-    public List<Voice> Voices { get; set; } = new();
-
-    [JsonPropertyName("custom_voices")]
-    public List<Voice> CustomVoices { get; set; } = new();
-}
-
-public class Voice
-{
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = "";
-
-    [JsonPropertyName("description")]
-    public string Description { get; set; } = "";
-
-    [JsonPropertyName("source")]
-    public string Source { get; set; } = "";
-
-    [JsonPropertyName("gender")]
-    public string Gender { get; set; } = "";
-
-    [JsonPropertyName("speakers")]
-    public List<string> Speakers { get; set; } = new();
+    // Алиасы для привязок XAML
+    public IAsyncRelayCommand ButtonLoadVoices => LoadVoicesCommand;
 }

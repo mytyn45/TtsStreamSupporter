@@ -1,201 +1,90 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
 using TtsStreamSupporter.Models;
 using TtsStreamSupporter.Services;
 
 namespace TtsStreamSupporter.ViewModels;
 
-public class IndividualVoicesTabViewModel : INotifyPropertyChanged
+public partial class IndividualVoicesTabViewModel : ViewModelBase
 {
     private readonly IndividualVoiceService _individualVoiceService;
+    private readonly IVoiceDiscoveryService _voiceDiscoveryService;
 
-    // ============================================
-    // ВСЕ ДОСТУПНЫЕ ГОЛОСА
-    // ============================================
+    public ObservableCollection<IndividualVoiceSettings> IndividualVoices => _individualVoiceService.Voices;
+    public ObservableCollection<IndividualVoiceSettings> EnabledVoices { get; } = new();
+    public ObservableCollection<IndividualVoiceAssignment> IndividualVoiceAssignments => _individualVoiceService.Assignments;
+    public ObservableCollection<IndividualVoiceAssignment> FilteredIndividualVoiceAssignments { get; } = new();
 
-    public ObservableCollection<IndividualVoiceSettings>
-        IndividualVoices =>
-        _individualVoiceService.Voices;
-
-
-    // ============================================
-    // ТОЛЬКО ВКЛЮЧЁННЫЕ ГОЛОСА
-    // ============================================
-
-    public ObservableCollection<IndividualVoiceSettings>
-        EnabledVoices
-    { get; }
-        = new();
-
-
-    // ============================================
-    // ПРИВЯЗКИ ПОЛЬЗОВАТЕЛЕЙ
-    // ============================================
-
-    public ObservableCollection<IndividualVoiceAssignment>
-        IndividualVoiceAssignments =>
-        _individualVoiceService.Assignments;
-
-
-    // ============================================
-    // КОНСТРУКТОР
-    // ============================================
+    [ObservableProperty]
+    private string _searchText = string.Empty;
 
     public IndividualVoicesTabViewModel(
-        IndividualVoiceService individualVoiceService)
+        IndividualVoiceService individualVoiceService,
+        IVoiceDiscoveryService? voiceDiscoveryService = null)
     {
-        _individualVoiceService =
-            individualVoiceService;
+        _individualVoiceService = individualVoiceService;
+        _voiceDiscoveryService = voiceDiscoveryService ?? new VoiceDiscoveryService();
 
-        // Следим за появлением/удалением пользователей
-        _individualVoiceService.Assignments.CollectionChanged +=
-            Assignments_CollectionChanged;
+        _individualVoiceService.Assignments.CollectionChanged += Assignments_CollectionChanged;
 
-        // Подписываемся на уже существующие привязки
-        // (важно и для сохранения смены голоса, и для поиска)
         foreach (var assignment in IndividualVoiceAssignments)
         {
-            assignment.PropertyChanged +=
-                Assignment_PropertyChanged;
+            assignment.PropertyChanged += Assignment_PropertyChanged;
         }
 
         if (Design.IsDesignMode)
             return;
 
-        // Загружаем голоса
         LoadIndividualVoices();
-
-        // Создаём список включённых голосов
         UpdateEnabledVoices();
-
-        // Привязываем загруженные VoiceName
-        // к объектам IndividualVoiceSettings
         InitializeSelectedVoices();
-
-        // Заполняем список для UI сразу при старте
         RefreshFilteredAssignments();
     }
 
-
-    // ============================================
-    // ЗАГРУЗКА ГОЛОСОВ
-    // ============================================
-
     private void LoadIndividualVoices()
     {
-        var saved =
-            VoiceSettingsStorage.Load();
+        var saved = VoiceSettingsStorage.Load();
+        var discoveredVoices = _voiceDiscoveryService.GetAvailableVoices();
 
-        using var synth =
-            new System.Speech.Synthesis.SpeechSynthesizer();
-
-
-        // ========================================
-        // СИСТЕМНЫЕ ГОЛОСА WINDOWS
-        // ========================================
-
-        foreach (
-            System.Speech.Synthesis.InstalledVoice voice
-            in synth.GetInstalledVoices())
+        foreach (var voiceName in discoveredVoices)
         {
-            AddVoice(
-                voice.VoiceInfo.Name,
-                saved);
-        }
-
-
-        // ========================================
-        // ГОЛОСА ИЗ MODELS
-        // ========================================
-
-        var modelsPath =
-            System.IO.Path.Combine(
-                System.IO.Directory.GetCurrentDirectory(),
-                "models");
-
-        if (System.IO.Directory.Exists(modelsPath))
-        {
-            var folderNames =
-                System.IO.Directory
-                    .GetDirectories(modelsPath)
-                    .Select(System.IO.Path.GetFileName);
-
-            foreach (var folder in folderNames)
-            {
-                if (folder != null)
-                {
-                    AddVoice(
-                        folder,
-                        saved);
-                }
-            }
+            AddVoice(voiceName, saved);
         }
     }
 
-
-    // ============================================
-    // ДОБАВЛЕНИЕ ГОЛОСА
-    // ============================================
-
-    private void AddVoice(
-        string name,
-        Dictionary<string, VoiceSettingsDto> saved)
+    private void AddVoice(string name, Dictionary<string, VoiceSettingsDto> saved)
     {
-        var settings =
-            saved.TryGetValue(
-                name,
-                out var dto)
-                ? new IndividualVoiceSettings(
-                    name,
-                    dto.Volume,
-                    dto.Speed,
-                    dto.IsEnabled)
-                : new IndividualVoiceSettings(name);
+        // Избегаем дубликатов, если голос уже добавлен в сервис
+        if (IndividualVoices.Any(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase)))
+            return;
 
+        var settings = saved.TryGetValue(name, out var dto)
+            ? new IndividualVoiceSettings(name, dto.Volume, dto.Speed, dto.IsEnabled)
+            : new IndividualVoiceSettings(name);
 
-        settings.PropertyChanged +=
-            VoiceSettings_PropertyChanged;
-
-
-        _individualVoiceService.AddVoice(
-            settings);
+        settings.PropertyChanged += VoiceSettings_PropertyChanged;
+        _individualVoiceService.AddVoice(settings);
     }
 
-
-    // ============================================
-    // ИЗМЕНЕНИЕ НАСТРОЕК ГОЛОСА
-    // ============================================
-
-    private void VoiceSettings_PropertyChanged(
-        object? sender,
-        PropertyChangedEventArgs e)
+    private void VoiceSettings_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName ==
-            nameof(IndividualVoiceSettings.IsEnabled))
+        if (e.PropertyName == nameof(IndividualVoiceSettings.IsEnabled))
         {
             UpdateEnabledVoices();
-
-            // Если список доступных голосов изменился,
-            // заново проверяем выбранные голоса.
             InitializeSelectedVoices();
         }
     }
 
-
-    // ============================================
-    // ОБНОВЛЕНИЕ СПИСКА ВКЛЮЧЁННЫХ ГОЛОСОВ
-    // ============================================
-
     private void UpdateEnabledVoices()
     {
         EnabledVoices.Clear();
-
         foreach (var voice in IndividualVoices)
         {
             if (voice.IsEnabled)
@@ -203,16 +92,7 @@ public class IndividualVoicesTabViewModel : INotifyPropertyChanged
                 EnabledVoices.Add(voice);
             }
         }
-
-        OnPropertyChanged(
-            nameof(EnabledVoices));
     }
-
-
-
-    // ============================================
-    // ВОССТАНОВЛЕНИЕ ВЫБРАННЫХ ГОЛОСОВ
-    // ============================================
 
     private void InitializeSelectedVoices()
     {
@@ -222,35 +102,23 @@ public class IndividualVoicesTabViewModel : INotifyPropertyChanged
         }
     }
 
-    private void InitializeSelectedVoice(
-        IndividualVoiceAssignment assignment)
+    private void InitializeSelectedVoice(IndividualVoiceAssignment assignment)
     {
-        var voice =
-            EnabledVoices.FirstOrDefault(
-                x => string.Equals(
-                    x.Name,
-                    assignment.VoiceName,
-                    StringComparison.OrdinalIgnoreCase));
+        var voice = EnabledVoices.FirstOrDefault(
+            x => string.Equals(x.Name, assignment.VoiceName, StringComparison.OrdinalIgnoreCase));
 
-        // Временно отписываемся, чтобы восстановление
-        // сохранённого голоса не воспринималось как
-        // ручной выбор пользователя и не дёргало сохранение.
         assignment.PropertyChanged -= Assignment_PropertyChanged;
         assignment.SelectedVoice = voice;
         assignment.PropertyChanged += Assignment_PropertyChanged;
     }
 
-    private void Assignments_CollectionChanged(
-        object? sender,
-        System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    private void Assignments_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (e.NewItems != null)
         {
             foreach (IndividualVoiceAssignment assignment in e.NewItems)
             {
-                assignment.PropertyChanged +=
-                    Assignment_PropertyChanged;
-
+                assignment.PropertyChanged += Assignment_PropertyChanged;
                 InitializeSelectedVoice(assignment);
             }
         }
@@ -259,84 +127,39 @@ public class IndividualVoicesTabViewModel : INotifyPropertyChanged
         {
             foreach (IndividualVoiceAssignment assignment in e.OldItems)
             {
-                assignment.PropertyChanged -=
-                    Assignment_PropertyChanged;
+                assignment.PropertyChanged -= Assignment_PropertyChanged;
             }
         }
 
         RefreshFilteredAssignments();
     }
 
-
-    // ============================================
-    // РЕАКЦИЯ НА РУЧНОЙ ВЫБОР ГОЛОСА В UI
-    // ============================================
-
-    private void Assignment_PropertyChanged(
-        object? sender,
-        PropertyChangedEventArgs e)
+    private void Assignment_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(IndividualVoiceAssignment.SelectedVoice))
             return;
 
-        if (sender is not IndividualVoiceAssignment assignment)
+        if (sender is not IndividualVoiceAssignment assignment || assignment.SelectedVoice == null)
             return;
 
-        if (assignment.SelectedVoice == null)
-            return;
+        _individualVoiceService.ChangeAssignmentVoice(assignment, assignment.SelectedVoice.Name);
 
-        // Именно этот вызов обновляет _assignments,
-        // VoiceName и сохраняет json.
-        _individualVoiceService.ChangeAssignmentVoice(
-            assignment,
-            assignment.SelectedVoice.Name);
-
-        Dispatcher.UIThread.Post(
-    RefreshFilteredAssignments,
-    DispatcherPriority.Background);
+        Dispatcher.UIThread.Post(RefreshFilteredAssignments, DispatcherPriority.Background);
     }
 
-
-    // ============================================
-    // ИЗМЕНЕНИЕ ГОЛОСА ПОЛЬЗОВАТЕЛЯ (программно)
-    // ============================================
-
-    public void ChangeAssignmentVoice(
-        IndividualVoiceAssignment assignment,
-        string? voiceName)
+    public void ChangeAssignmentVoice(IndividualVoiceAssignment assignment, string? voiceName)
     {
-        if (assignment == null)
+        if (assignment == null || string.IsNullOrWhiteSpace(voiceName))
             return;
 
-        if (string.IsNullOrWhiteSpace(voiceName))
+        var voice = IndividualVoices.FirstOrDefault(
+            x => string.Equals(x.Name, voiceName, StringComparison.OrdinalIgnoreCase));
+
+        if (voice == null || !voice.IsEnabled)
             return;
 
+        _individualVoiceService.ChangeAssignmentVoice(assignment, voiceName);
 
-        var voice =
-            IndividualVoices.FirstOrDefault(
-                x => string.Equals(
-                    x.Name,
-                    voiceName,
-                    StringComparison.OrdinalIgnoreCase));
-
-
-        if (voice == null)
-            return;
-
-
-        // Нельзя выбрать выключенный голос
-        if (!voice.IsEnabled)
-            return;
-
-
-        _individualVoiceService.ChangeAssignmentVoice(
-            assignment,
-            voiceName);
-
-
-        // Обновляем выбранный объект для ComboBox
-        // (отписка/подписка — чтобы не задвоить сохранение,
-        // ChangeAssignmentVoice уже сохранил json)
         assignment.PropertyChanged -= Assignment_PropertyChanged;
         assignment.SelectedVoice = voice;
         assignment.PropertyChanged += Assignment_PropertyChanged;
@@ -344,33 +167,16 @@ public class IndividualVoicesTabViewModel : INotifyPropertyChanged
         RefreshFilteredAssignments();
     }
 
-
-    // ============================================
-    // ПОИСК
-    // ============================================
-
-    private string _searchText = string.Empty;
-    public string SearchText
+    partial void OnSearchTextChanged(string value)
     {
-        get => _searchText;
-        set
-        {
-            if (SetProperty(ref _searchText, value))
-                RefreshFilteredAssignments();
-        }
+        RefreshFilteredAssignments();
     }
-
-    public ObservableCollection<IndividualVoiceAssignment>
-        FilteredIndividualVoiceAssignments
-    { get; }
-        = new();
 
     private void RefreshFilteredAssignments()
     {
         FilteredIndividualVoiceAssignments.Clear();
 
-        IEnumerable<IndividualVoiceAssignment> query =
-            IndividualVoiceAssignments;
+        IEnumerable<IndividualVoiceAssignment> query = IndividualVoiceAssignments;
 
         if (!string.IsNullOrWhiteSpace(SearchText))
         {
@@ -381,38 +187,8 @@ public class IndividualVoicesTabViewModel : INotifyPropertyChanged
         }
 
         foreach (var item in query)
+        {
             FilteredIndividualVoiceAssignments.Add(item);
+        }
     }
-
-
-    // ============================================
-    // PROPERTY CHANGED
-    // ============================================
-
-    public event PropertyChangedEventHandler?
-        PropertyChanged;
-
-
-    protected bool SetProperty<T>(
-        ref T field,
-        T value,
-        [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-            return false;
-
-        field = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
-
-    protected void OnPropertyChanged(
-        [CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(
-            this,
-            new PropertyChangedEventArgs(
-                propertyName));
-    }
-
 }

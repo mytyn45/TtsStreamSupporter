@@ -56,7 +56,7 @@ namespace TtsStreamSupporter.Settings
 
             string[] dataFolders = [DataForProgramFolder];
             string[] subFolders = ["BlackList", "Profiles", "WordReplace", "Voices", "SoundEffects"];
-            string[] voiceDbs = ["GoodgameIndividualVoices.db", "IndividualVoices.db", "TwitchIndividualVoices.db", "VkIndividualVoices.db"];
+            string[] voiceDbs = ["GoodgameIndividualVoices.db", "IndividualVoices.db", "KickIndividualVoices.db", "TwitchIndividualVoices.db", "VkIndividualVoices.db"];
 
             foreach (var baseDir in dataFolders)
             {

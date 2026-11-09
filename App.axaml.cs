@@ -3,8 +3,10 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using TtsStreamSupporter.Services;
+using TtsStreamSupporter.ViewModels;
 
 namespace TtsStreamSupporter;
 
@@ -19,7 +21,11 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow();
+            var mainWindow = new MainWindow
+            {
+                DataContext = Program.Services.GetRequiredService<MainWindowViewModel>()
+            };
+            desktop.MainWindow = mainWindow;
         }
 
         base.OnFrameworkInitializationCompleted();

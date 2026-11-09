@@ -1,8 +1,6 @@
-using System;
 using System.IO;
 using System.Diagnostics;
 using Serilog;
-using TtsStreamSupporter.Services;
 using TtsStreamSupporter.Settings;
 
 namespace TtsStreamSupporter.Services;

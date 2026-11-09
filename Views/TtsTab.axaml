@@ -157,41 +157,93 @@
 
                 </StackPanel>
 
-                <!-- Команды чата -->
-                <Border Grid.Column="2"
-                        BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
-                        Padding="12"
-                        VerticalAlignment="Top">
-                    <StackPanel Spacing="10">
+                <!-- Команды чата и Фильтр мата -->
+                <StackPanel Grid.Column="2" Spacing="10" VerticalAlignment="Top">
 
-                        <TextBlock Text="Команды чата" FontWeight="Bold" FontSize="14"/>
+                    <!-- Команды чата -->
+                    <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
+                            Padding="12">
+                        <StackPanel Spacing="10">
 
-                        <Grid ColumnDefinitions="*,Auto"
-                              RowDefinitions="Auto,Auto,Auto,Auto"
-                              ColumnSpacing="10" RowSpacing="10">
+                            <TextBlock Text="Команды чата" FontWeight="Bold" FontSize="14"/>
 
-                            <Label Grid.Column="0" Grid.Row="0"
-                                   Content="Не озвучивать если начинается с"
-                                   VerticalAlignment="Center" Padding="0"/>
-                            <TextBox Grid.Column="1" Grid.Row="0"
-                                     Text="{Binding DoNotTtsIfStartWith}"/>
+                            <Grid ColumnDefinitions="*,Auto"
+                                  RowDefinitions="Auto,Auto,Auto,Auto"
+                                  ColumnSpacing="10" RowSpacing="10">
 
-                            <Label Grid.Column="0" Grid.Row="1"
-                                   Content="Пропуск одного сообщения"
-                                   VerticalAlignment="Center" Padding="0"/>
-                            <TextBox Grid.Column="1" Grid.Row="1"
-                                     Text="{Binding SkipMessage}"/>
+                                <Label Grid.Column="0" Grid.Row="0"
+                                       Content="Не озвучивать если начинается с"
+                                       VerticalAlignment="Center" Padding="0"/>
+                                <TextBox Grid.Column="1" Grid.Row="0"
+                                         Text="{Binding DoNotTtsIfStartWith}"/>
 
-                            <Label Grid.Column="0" Grid.Row="2"
-                                   Content="Пропустить все сообщения"
-                                   VerticalAlignment="Center" Padding="0"/>
-                            <TextBox Grid.Column="1" Grid.Row="2"
-                                     Text="{Binding SkipAllMessages}"/>
-                            <CheckBox Content="Включить" Grid.Row="3" IsChecked="{Binding CheckBoxAllowSkipMessages}"></CheckBox>
-                        </Grid>
+                                <Label Grid.Column="0" Grid.Row="1"
+                                       Content="Пропуск одного сообщения"
+                                       VerticalAlignment="Center" Padding="0"/>
+                                <TextBox Grid.Column="1" Grid.Row="1"
+                                         Text="{Binding SkipMessage}"/>
 
-                    </StackPanel>
-                </Border>
+                                <Label Grid.Column="0" Grid.Row="2"
+                                       Content="Пропустить все сообщения"
+                                       VerticalAlignment="Center" Padding="0"/>
+                                <TextBox Grid.Column="1" Grid.Row="2"
+                                         Text="{Binding SkipAllMessages}"/>
+                                <CheckBox Content="Включить" Grid.Row="3" IsChecked="{Binding CheckBoxAllowSkipMessages}"></CheckBox>
+                            </Grid>
+
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Фильтр мата -->
+                    <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
+                            Padding="12">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Фильтр мата" FontWeight="Bold" FontSize="14"/>
+                            <CheckBox Content="Включить" IsChecked="{Binding BadWordsFilter}"/>
+
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <Label Grid.Column="0"
+                                       Content="Во что изменять мат"
+                                       VerticalAlignment="Center" Padding="0"/>
+                                <TextBox Grid.Column="1"
+                                         MinWidth="140"
+                                         Text="{Binding BadWordReplacement}"
+                                         PlaceholderText="например: ***"/>
+                            </Grid>
+
+                            <TextBlock Text="Не заменять слова:" FontWeight="SemiBold"/>
+
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding TextBoxAddToBadWordFilterWhitelist}"
+                                         PlaceholderText="Слово для исключения"/>
+                                <Button Grid.Column="1"
+                                        Content="Добавить"
+                                        Command="{Binding ButtonAddToBadWordFilterWhitelist}"/>
+                            </Grid>
+
+                            <Border BorderBrush="LightGray" BorderThickness="1" ClipToBounds="True">
+                                <ListBox ItemsSource="{Binding ListBoxItemSourceBadWordFilterWhitelist}"
+                                         SelectedItem="{Binding SelectedBadWordFilterWhitelistItem}"
+                                         Height="120"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.IsScrollInertiaEnabled="True">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+
+                            <Button Content="Удалить"
+                                    Command="{Binding ButtonRemoveFromBadWordFilterWhitelist}"
+                                    HorizontalAlignment="Left"/>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
 
             </Grid>
 

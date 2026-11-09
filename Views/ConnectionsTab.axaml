@@ -4,46 +4,52 @@
              x:Class="TtsStreamSupporter.Views.ConnectionsTab"
              x:DataType="vm:ConnectionsTabViewModel">
 
-    <Grid ColumnDefinitions="Auto, Auto, Auto" RowDefinitions="Auto, Auto, Auto">
+    <Grid ColumnDefinitions="Auto, Auto, Auto, Auto" RowDefinitions="Auto, Auto, Auto">
+        <!-- Twitch -->
         <Border Grid.Column="0" Grid.Row="0" BorderBrush="Black" BorderThickness="1" Margin="5">
             <StackPanel Spacing="10" Margin="5">
-
                 <CheckBox Content="Twitch (ник)" IsChecked="{Binding CheckboxConnectToTwitch}"/>
-
                 <TextBox ToolTip.Tip="Какой канал слушать" Text="{Binding TwitchNick, FallbackValue=toltoon45}"/>
-
             </StackPanel>
         </Border>
 
+        <!-- GoodGame -->
         <Border Grid.Column="1" Grid.Row="0" BorderBrush="Black" BorderThickness="1" Margin="5">
             <StackPanel Spacing="10" Margin="5">
-
                 <CheckBox Content="Goodgame (ник)" IsChecked="{Binding CheckboxConnectToGoodgame}"/>
-
                 <TextBox ToolTip.Tip="Какой канал слушать" Text="{Binding GoodgameNick, FallbackValue=toltoon45}"/>
-
             </StackPanel>
         </Border>
 
+        <!-- Kick -->
         <Border Grid.Column="2" Grid.Row="0" BorderBrush="Black" BorderThickness="1" Margin="5">
             <StackPanel Spacing="10" Margin="5">
-
-                <CheckBox Content="BlueStar (api)" IsChecked="{Binding CheckboxConnectToBluestar}"/>
-
-                <TextBox ToolTip.Tip="Какой канал слушать" Text="{Binding BluestarApi, FallbackValue=xxx-xxx-xxx}" MaxWidth="100"/>
-
+                <CheckBox Content="Kick (ник)" IsChecked="{Binding CheckboxConnectToKick}"/>
+                <TextBox ToolTip.Tip="Какой канал слушать" Text="{Binding KickNick, FallbackValue=toltoon45}"/>
             </StackPanel>
         </Border>
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="5">
+
+        <!-- BlueStar -->
+        <Border Grid.Column="3" Grid.Row="0" BorderBrush="Black" BorderThickness="1" Margin="5">
+            <StackPanel Spacing="10" Margin="5">
+                <CheckBox Content="BlueStar (api)" IsChecked="{Binding CheckboxConnectToBluestar}"/>
+                <TextBox ToolTip.Tip="Какой канал слушать" Text="{Binding BluestarApi, FallbackValue=xxx-xxx-xxx}" MaxWidth="100"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Кнопки управления -->
+        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="10" Margin="5">
             <Button Content="Подключиться" Command="{Binding ButtonConnectToChats}"/>
             <Button Content="Переподключиться" Command="{Binding ButtonReconnectToChats}"/>
         </StackPanel>
-        <StackPanel Grid.Row="2" Margin="5">
-            <Label Content="Искусственная задержка для TTS МЕЖДУ сообщениями"></Label>
-            <CheckBox Content="Включить" IsChecked="{Binding TtsDelayEnabled}"></CheckBox>
-            <StackPanel Orientation="Horizontal">
-                <Slider Minimum="0" Maximum="10" Value="{Binding TtsDelayTime}" Width="100"></Slider>
-                <Label Content="{Binding TtsDelayTime}"></Label>
+
+        <!-- Настройки задержки TTS -->
+        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4" Margin="5">
+            <Label Content="Искусственная задержка для TTS МЕЖДУ сообщениями"/>
+            <CheckBox Content="Включить" IsChecked="{Binding TtsDelayEnabled}"/>
+            <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                <Slider Minimum="0" Maximum="10" Value="{Binding TtsDelayTime}" Width="100"/>
+                <Label Content="{Binding TtsDelayTime}"/>
             </StackPanel>
         </StackPanel>
     </Grid>

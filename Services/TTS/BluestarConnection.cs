@@ -223,7 +223,7 @@ public class BluestarConnection : ConnectionBase
                     MessageReceived?.Invoke(new ChatMessageReceived
                     {
                         Username = message.DisplayName ?? "",
-                        VoiceName = null,
+                        VoiceName = "",
                         Message = message.Body ?? "",
                         Platform = "twitch"
                     });

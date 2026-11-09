@@ -6,22 +6,13 @@
 
     <Grid RowDefinitions="*,Auto" Margin="5">
         <Border Grid.Row="0" BorderBrush="Black" BorderThickness="1" Margin="5">
-            <Grid RowDefinitions="Auto,*">
-
-                <ListBox Grid.Row="1"
-                         ItemsSource="{Binding ListBoxLogs}"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                         HorizontalAlignment="Stretch"
-                         VerticalAlignment="Stretch"/>
-            </Grid>
+            <ListBox ItemsSource="{Binding ListBoxLogs}"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     HorizontalAlignment="Stretch"
+                     VerticalAlignment="Stretch"/>
         </Border>
-        <Button Grid.Row="1"
-                Content="Логи"
-                Command="{Binding OpenLogsFolder}"
-                VerticalAlignment="Center"
-                HorizontalAlignment="Right"
-                Margin="5"/>
+
         <StackPanel Grid.Row="1"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"

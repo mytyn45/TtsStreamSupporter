@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Http;
 using System.Net.WebSockets;
@@ -18,6 +19,11 @@ public class GoodgameConnection : ConnectionBase
 
     public event Action<ChatMessageReceived>? MessageReceived;
 
+    private static readonly ConcurrentDictionary<string, string> _channelIdCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly HttpClient _httpClient = CreateGoodgameHttpClient();
+
     private ClientWebSocket? _webSocket;
     private CancellationTokenSource? _cts;
     private Task? _readTask;
@@ -26,6 +32,15 @@ public class GoodgameConnection : ConnectionBase
     public GoodgameConnection()
     {
         Instance = this;
+    }
+
+    private static HttpClient CreateGoodgameHttpClient()
+    {
+        var client = new HttpClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+        client.Timeout = TimeSpan.FromSeconds(10);
+        return client;
     }
 
     public async Task ReconnectAsync(string? channelToConnect)
@@ -79,11 +94,32 @@ public class GoodgameConnection : ConnectionBase
         _channelName = channelToConnect;
         _cts = new CancellationTokenSource();
 
-        string profile = $"https://goodgame.ru/{channelToConnect}";
+        string channelKey = channelToConnect.Trim();
 
         try
         {
-            var channelId = await GetChannelPreload(profile);
+            string? channelId = null;
+
+            // 1. Если пользователь ввёл числовой ID напрямую (например "12345"), пропускаем HTTP-запрос
+            if (long.TryParse(channelKey, out _))
+            {
+                channelId = channelKey;
+            }
+            // 2. Проверяем кэш channel_id, чтобы не парсить страницу при каждом подключении
+            else if (_channelIdCache.TryGetValue(channelKey, out var cachedId))
+            {
+                channelId = cachedId;
+            }
+            else
+            {
+                string profile = $"https://goodgame.ru/{Uri.EscapeDataString(channelKey)}";
+                channelId = await GetChannelPreload(profile);
+                if (!string.IsNullOrWhiteSpace(channelId))
+                {
+                    _channelIdCache[channelKey] = channelId;
+                }
+            }
+
             if (string.IsNullOrWhiteSpace(channelId))
             {
                 Log.Error("Не удалось получить channel_id для GoodGame {Channel}", channelToConnect);
@@ -114,7 +150,7 @@ public class GoodgameConnection : ConnectionBase
 
             _webSocket = socket;
             SetState(ConnectionState.Connected);
-            Log.Information("Подключение к GoodGame {Channel} завершено.", channelToConnect);
+            Log.Information("Подключение к GoodGame {Channel} (ID: {ChannelId}) завершено.", channelToConnect, channelId);
 
             _readTask = Task.Run(() => ReceiveLoopAsync(socket, _cts.Token));
         }
@@ -133,23 +169,60 @@ public class GoodgameConnection : ConnectionBase
     private async Task ReceiveLoopAsync(ClientWebSocket socket, CancellationToken ct)
     {
         var bufferToReceive = new byte[8192];
+        using var ms = new MemoryStream();
+
         try
         {
             while (!ct.IsCancellationRequested && socket.State == WebSocketState.Open)
             {
-                var result = await socket.ReceiveAsync(
-                    new ArraySegment<byte>(bufferToReceive),
-                    ct);
+                ms.SetLength(0);
+                WebSocketReceiveResult result;
+
+                do
+                {
+                    result = await socket.ReceiveAsync(
+                        new ArraySegment<byte>(bufferToReceive),
+                        ct);
+
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        break;
+                    }
+
+                    ms.Write(bufferToReceive, 0, result.Count);
+                }
+                while (!result.EndOfMessage);
 
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
                     break;
                 }
 
-                string receivedMessage = Encoding.UTF8.GetString(bufferToReceive, 0, result.Count);
+                string receivedMessage = Encoding.UTF8.GetString(ms.ToArray());
                 try
                 {
                     JObject jsonObj = JObject.Parse(receivedMessage);
+                    string? messageType = jsonObj["type"]?.ToString();
+
+                    // Сервер GoodGame отправляет heartbeat {"type":"ping"} — отвечаем pong, чтобы соединение не рвалось
+                    if (string.Equals(messageType, "ping", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var pongBytes = Encoding.UTF8.GetBytes("{\"type\":\"pong\"}");
+                        await socket.SendAsync(
+                            new ArraySegment<byte>(pongBytes),
+                            WebSocketMessageType.Text,
+                            true,
+                            ct);
+                        continue;
+                    }
+
+                    // Озвучиваем только реальные сообщения чата и донаты
+                    if (!string.Equals(messageType, "message", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(messageType, "payment", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     string? userName = jsonObj["data"]?["user_name"]?.ToString();
                     string? textValue = jsonObj["data"]?["text"]?.ToString();
 
@@ -157,8 +230,8 @@ public class GoodgameConnection : ConnectionBase
                     {
                         MessageReceived?.Invoke(new ChatMessageReceived
                         {
-                            Username = userName,
-                            VoiceName = null,
+                            Username = string.IsNullOrWhiteSpace(userName) ? "Аноним" : userName,
+                            VoiceName = string.Empty,
                             Message = textValue,
                             Platform = "goodgame"
                         });
@@ -193,33 +266,46 @@ public class GoodgameConnection : ConnectionBase
 
     private static async Task<string?> GetChannelPreload(string url)
     {
-        using var httpClient = new HttpClient();
-        var htmlContent = await httpClient.GetStringAsync(url);
-
-        var doc = new HtmlDocument();
-        doc.LoadHtml(htmlContent);
-
-        var scriptNode = doc.DocumentNode.SelectSingleNode(
-            "//script[contains(text(), 'ChannelPreload')]");
-
-        if (scriptNode == null)
-            return null;
-
-        var scriptText = scriptNode.InnerText.Trim();
-
-        var startIndex = scriptText.IndexOf('{');
-        var endIndex = scriptText.LastIndexOf('}');
-        var jsonContent = scriptText.Substring(startIndex, endIndex - startIndex + 1);
-
-        using var reader = new JsonTextReader(new StringReader(jsonContent));
-        while (reader.Read())
+        try
         {
-            if (reader.TokenType == JsonToken.PropertyName &&
-                reader.Value?.ToString() == "channel_id")
+            var htmlContent = await _httpClient.GetStringAsync(url);
+
+            var doc = new HtmlDocument();
+            doc.LoadHtml(htmlContent);
+
+            var scriptNode = doc.DocumentNode.SelectSingleNode(
+                "//script[contains(text(), 'ChannelPreload')]");
+
+            if (scriptNode == null)
+                return null;
+
+            var scriptText = scriptNode.InnerText.Trim();
+
+            var startIndex = scriptText.IndexOf('{');
+            var endIndex = scriptText.LastIndexOf('}');
+            if (startIndex < 0 || endIndex <= startIndex)
+                return null;
+
+            var jsonContent = scriptText.Substring(startIndex, endIndex - startIndex + 1);
+
+            using var reader = new JsonTextReader(new StringReader(jsonContent));
+            while (reader.Read())
             {
-                reader.Read();
-                return reader.Value?.ToString();
+                if (reader.TokenType == JsonToken.PropertyName &&
+                    reader.Value?.ToString() == "channel_id")
+                {
+                    reader.Read();
+                    return reader.Value?.ToString();
+                }
             }
+        }
+        catch (HttpRequestException ex)
+        {
+            Log.Warning(ex, "HTTP ошибка при получении preload страницы GoodGame {Url}", url);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Ошибка при парсинге preload страницы GoodGame {Url}", url);
         }
 
         return null;

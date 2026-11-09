@@ -1,18 +1,27 @@
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace TtsStreamSupporter.Models;
 
 /// <summary>
 /// Настройки одного голоса (SAPI или Piper) для индивидуальных привязок.
 /// </summary>
-public class IndividualVoiceSettings : INotifyPropertyChanged
+public partial class IndividualVoiceSettings : ObservableObject
 {
-    private string _name;
-    private int _volume;
-    private int _speed;
-    private bool _isEnabled;
+    [ObservableProperty]
+    private string _name = "";
+
+    [ObservableProperty]
+    private int _volume = 100;
+
+    [ObservableProperty]
+    private int _speed = 0;
+
+    [ObservableProperty]
+    private bool _isEnabled = true;
+
+    public IndividualVoiceSettings()
+    {
+    }
 
     public IndividualVoiceSettings(
         string name,
@@ -20,48 +29,9 @@ public class IndividualVoiceSettings : INotifyPropertyChanged
         int speed = 0,
         bool isEnabled = true)
     {
-        _name = name;
-        _volume = volume;
-        _speed = speed;
-        _isEnabled = isEnabled;
-    }
-
-    public string Name
-    {
-        get => _name;
-        set => SetField(ref _name, value);
-    }
-
-    public int Volume
-    {
-        get => _volume;
-        set => SetField(ref _volume, value);
-    }
-
-    public int Speed
-    {
-        get => _speed;
-        set => SetField(ref _speed, value);
-    }
-
-    public bool IsEnabled
-    {
-        get => _isEnabled;
-        set => SetField(ref _isEnabled, value);
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    protected bool SetField<T>(
-        ref T field,
-        T value,
-        [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-            return false;
-
-        field = value;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        return true;
+        Name = name;
+        Volume = volume;
+        Speed = speed;
+        IsEnabled = isEnabled;
     }
 }

@@ -11,3 +11,10 @@ obj/
 # Временные логи и кэш
 *.log
 TestResults/
+# Локальные данные: движок Piper, голосовые модели, логи, IDE
+piper/
+Models/*/
+logs/
+.vscode/
+*.onnx
+*.onnx.json

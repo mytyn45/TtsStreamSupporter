@@ -1,732 +1,402 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Speech.Synthesis;
-using System.Windows.Input;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Media;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Serilog;
 using TtsStreamSupporter.Models;
 using TtsStreamSupporter.Services;
 using TtsStreamSupporter.Settings;
 
 namespace TtsStreamSupporter.ViewModels;
 
-public class TtsTabViewModel : INotifyPropertyChanged
+public partial class TtsTabViewModel : ViewModelBase
 {
     private readonly SettingsService _settings;
-    public event PropertyChangedEventHandler? PropertyChanged;
+    private readonly IVoiceDiscoveryService _voiceDiscoveryService;
+
+    // Списки всех замен (полная база для фильтрации)
+    private readonly List<WordReplacementItemViewModel> _allWordReplacements = new();
+    private readonly List<WordReplacementItemViewModel> _allCharWordReplacements = new();
+
+    // =========================================================
+    // ГОЛОСА
+    // =========================================================
+
+    public ObservableCollection<string> ComboBoxItemSourceInstalledVoices { get; } = new();
+
+    [ObservableProperty]
     private string? _comboBoxSelectedItemInstalledVoices;
+
+    [ObservableProperty]
     private int _sliderSingleVoiceVolume;
+
+    [ObservableProperty]
     private int _sliderSingleVoiceSpeed;
-    private int _sliderCompressorPower;
-    private double _sliderMasterVolumeMultiplier = 1.0;
-    private bool _checkBoxNormalizationTts;
-    private bool _checkBoxAllowSkipMessages;
-    private ObservableCollection<string> _availableVoices = [];
-    public ObservableCollection<string> ComboBoxSelectedItemDownloadPiperVoice { get; set; } = new ObservableCollection<string>();
-    private readonly System.Collections.Generic.List<WordReplacementItemViewModel> _allWordReplacements = new();
-    public ObservableCollection<WordReplacementItemViewModel> FilteredWordReplacements { get; } = new();
-    private WordReplacementItemViewModel? _selectedWordReplacementItem;
-    private bool _isExactMatchFound;
-    private bool _isFiltering;
 
-    private readonly System.Collections.Generic.List<WordReplacementItemViewModel> _allCharWordReplacements = new();
-    public ObservableCollection<WordReplacementItemViewModel> FilteredCharWordReplacements { get; } = new();
-    private WordReplacementItemViewModel? _selectedCharReplacementItem;
-    private bool _isCharExactMatchFound;
-    private bool _isCharFiltering;
+    // =========================================================
+    // PIPER ГОЛОСА
+    // =========================================================
 
-    public WordReplacementItemViewModel? SelectedWordReplacementItem
-    {
-        get => _selectedWordReplacementItem;
-        set
-        {
-            _selectedWordReplacementItem = value;
-            OnPropertyChanged();
+    public ObservableCollection<string> ComboBoxItemSourceAvailablePiperVoices { get; } = new();
 
-            if (value != null)
-            {
-                _textBoxWordToReplace = value.Word;
-                _textBoxReplacementWord = value.Replacement;
-
-                OnPropertyChanged(nameof(TextBoxWordToReplace));
-                OnPropertyChanged(nameof(TextBoxReplacementWord));
-            }
-        }
-    }
-
-    public WordReplacementItemViewModel? SelectedCharReplacementItem
-    {
-        get => _selectedCharReplacementItem;
-        set
-        {
-            _selectedCharReplacementItem = value;
-            OnPropertyChanged();
-
-            if (value != null)
-            {
-                _textBoxCharToFind = value.Word;
-                _textBoxCharReplacementWord = value.Replacement;
-
-                OnPropertyChanged(nameof(TextBoxCharToFind));
-                OnPropertyChanged(nameof(TextBoxCharReplacementWord));
-            }
-        }
-    }
-
-    public bool IsExactMatchFound
-    {
-        get => _isExactMatchFound;
-        set
-        {
-            if (_isExactMatchFound == value) return;
-            _isExactMatchFound = value;
-            OnPropertyChanged();
-        }
-    }
-
-    public bool IsCharExactMatchFound
-    {
-        get => _isCharExactMatchFound;
-        set
-        {
-            if (_isCharExactMatchFound == value) return;
-            _isCharExactMatchFound = value;
-            OnPropertyChanged();
-        }
-    }
-
+    [ObservableProperty]
     private string? _selectedPiperVoiceToDownload;
-    public ICommand ButtonDownloadPiperVoice { get; }
-    public ICommand ButtonAddToBlackList { get; }
-    public ICommand ButtonRemoveFromBlackList { get; }
-    public ICommand ButtonAddWordReplacement { get; }
-    public ICommand ButtonRemoveWordReplacement { get; }
-    public ICommand ButtonAddCharReplacement { get; }
-    public ICommand ButtonRemoveCharReplacement { get; }
-    public string? _textBoxAddToBlackList { get; set; }
-    public string? _textBoxWordToReplace;
-    public string? _textBoxReplacementWord;
-    public string? _textBoxCharToFind;
-    public string? _textBoxCharReplacementWord;
-    public ObservableCollection<string> ListBoxItemSourceBlacklist { get; set; } = new ObservableCollection<string>();
 
-    public TtsTabViewModel(SettingsService settings)
+    [ObservableProperty]
+    private bool _isPiperDownloading;
+
+    [ObservableProperty]
+    private bool _isPiperDownloadProgressVisible;
+
+    [ObservableProperty]
+    private double _piperDownloadProgressValue;
+
+    [ObservableProperty]
+    private bool _isPiperDownloadIndeterminate;
+
+    [ObservableProperty]
+    private string _piperDownloadStatusText = string.Empty;
+
+    [ObservableProperty]
+    private string _piperDownloadProgressText = string.Empty;
+
+    [ObservableProperty]
+    private IBrush _piperDownloadStatusBrush = Brushes.Gray;
+
+    // =========================================================
+    // ЗВУКОВЫЕ ЭФФЕКТЫ
+    // =========================================================
+
+    [ObservableProperty]
+    private bool _checkBoxNormalizationTts;
+
+    [ObservableProperty]
+    private int _sliderCompressorPower;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MasterVolumeMultiplierText))]
+    private double _sliderMasterVolumeMultiplier = 1.0;
+
+    public string MasterVolumeMultiplierText => $"x{SliderMasterVolumeMultiplier:F1}";
+
+    // =========================================================
+    // КОМАНДЫ ЧАТА
+    // =========================================================
+
+    [ObservableProperty]
+    private string _doNotTtsIfStartWith = "!";
+
+    [ObservableProperty]
+    private string _skipMessage = "!c";
+
+    [ObservableProperty]
+    private string _skipAllMessages = "!cв";
+
+    [ObservableProperty]
+    private bool _checkBoxAllowSkipMessages;
+
+    // =========================================================
+    // ФИЛЬТР МАТА
+    // =========================================================
+
+    [ObservableProperty]
+    private bool _badWordsFilter;
+
+    [ObservableProperty]
+    private string? _badWordReplacement = "***";
+
+    [ObservableProperty]
+    private string? _textBoxAddToBadWordFilterWhitelist;
+
+    [ObservableProperty]
+    private string? _selectedBadWordFilterWhitelistItem;
+
+    public ObservableCollection<string> ListBoxItemSourceBadWordFilterWhitelist { get; } = new();
+
+    // =========================================================
+    // ЧЁРНЫЙ СПИСОК
+    // =========================================================
+
+    [ObservableProperty]
+    private string? _textBoxAddToBlackList;
+
+    [ObservableProperty]
+    private string? _selectedBlacklistItem;
+
+    public ObservableCollection<string> ListBoxItemSourceBlacklist { get; } = new();
+
+    // =========================================================
+    // ЗАМЕНА СЛОВ
+    // =========================================================
+
+    [ObservableProperty]
+    private string? _textBoxWordToReplace;
+
+    [ObservableProperty]
+    private string? _textBoxReplacementWord;
+
+    [ObservableProperty]
+    private WordReplacementItemViewModel? _selectedWordReplacementItem;
+
+    [ObservableProperty]
+    private bool _isExactMatchFound;
+
+    public ObservableCollection<WordReplacementItemViewModel> FilteredWordReplacements { get; } = new();
+
+    // =========================================================
+    // ЗАМЕНА СИМВОЛОВ
+    // =========================================================
+
+    [ObservableProperty]
+    private string? _textBoxCharToFind;
+
+    [ObservableProperty]
+    private string? _textBoxCharReplacementWord;
+
+    [ObservableProperty]
+    private WordReplacementItemViewModel? _selectedCharReplacementItem;
+
+    [ObservableProperty]
+    private bool _isCharExactMatchFound;
+
+    public ObservableCollection<WordReplacementItemViewModel> FilteredCharWordReplacements { get; } = new();
+
+    // =========================================================
+    // КОНСТРУКТОР
+    // =========================================================
+
+    public TtsTabViewModel(
+        SettingsService settings,
+        IVoiceDiscoveryService? voiceDiscoveryService = null)
     {
         _settings = settings;
-        LoadAvailableVoices.GetListOfAvailableVoices(_availableVoices);
-        ButtonDownloadPiperVoice = new RelayCommand(InstallPiperVoices);
-        ButtonAddToBlackList = new RelayCommand(AddToBlackList);
-        ButtonRemoveFromBlackList = new RelayCommand(RemoveFromBlackList);
-        ButtonAddWordReplacement = new RelayCommand(AddToWordReplacement);
-        ButtonRemoveWordReplacement = new RelayCommand(RemoveToWordReplacement);
-        ButtonAddCharReplacement = new RelayCommand(AddCharReplacement);
-        ButtonRemoveCharReplacement = new RelayCommand(RemoveCharReplacement);
+        _voiceDiscoveryService = voiceDiscoveryService ?? new VoiceDiscoveryService();
+
+        // Загрузка доступных системных и скачанных голосов
+        LoadVoicesList();
 
         if (Design.IsDesignMode)
             return;
 
-        _sliderSingleVoiceVolume = _settings.Settings.StandardVoiceVolume;
-        _sliderSingleVoiceSpeed = _settings.Settings.StandardVoiceSpeed;
-        _sliderCompressorPower = _settings.Settings.CompressorPower;
-        _sliderMasterVolumeMultiplier = _settings.Settings.MasterVolumeMultiplier <= 0f ? 1.0 : Math.Round(_settings.Settings.MasterVolumeMultiplier, 1);
-        _comboBoxSelectedItemInstalledVoices = _settings.Settings.SelectedSingleVoice;
-        _checkBoxNormalizationTts = _settings.Settings.CheckBoxNormalizationTts;
-        _checkBoxAllowSkipMessages = _settings.Settings.CheckBoxAllowSkipMessages;
+        // Загрузка настроек
+        SliderSingleVoiceVolume = _settings.Settings.StandardVoiceVolume;
+        SliderSingleVoiceSpeed = _settings.Settings.StandardVoiceSpeed;
+        SliderCompressorPower = _settings.Settings.CompressorPower;
+        SliderMasterVolumeMultiplier = _settings.Settings.MasterVolumeMultiplier <= 0f
+            ? 1.0
+            : Math.Round(_settings.Settings.MasterVolumeMultiplier, 1);
 
+        ComboBoxSelectedItemInstalledVoices = _settings.Settings.SelectedSingleVoice;
+        CheckBoxNormalizationTts = _settings.Settings.CheckBoxNormalizationTts;
+        CheckBoxAllowSkipMessages = _settings.Settings.CheckBoxAllowSkipMessages;
+        BadWordsFilter = _settings.Settings.BadWordFilter;
+        BadWordReplacement = _settings.Settings.BadWordReplacement;
 
+        if (!string.IsNullOrEmpty(_settings.Settings.DoNotTtsIfStartWith))
+            _doNotTtsIfStartWith = _settings.Settings.DoNotTtsIfStartWith;
+        if (!string.IsNullOrEmpty(_settings.Settings.SkipMessage))
+            _skipMessage = _settings.Settings.SkipMessage;
+        if (!string.IsNullOrEmpty(_settings.Settings.SkipAllMessages))
+            _skipAllMessages = _settings.Settings.SkipAllMessages;
+
+        // Piper доступные для загрузки голоса
+        LoadAvailablePiperVoices();
+
+        // Черный список
+        foreach (var user in _settings.Settings.ListBoxItemSourceBlackList)
+            ListBoxItemSourceBlacklist.Add(user);
+
+        // Белый список фильтра мата
+        if (_settings.Settings.BadWordFilterWhitelist != null)
+        {
+            foreach (var word in _settings.Settings.BadWordFilterWhitelist)
+                ListBoxItemSourceBadWordFilterWhitelist.Add(word);
+        }
+
+        // Замена слов
+        foreach (var kvp in _settings.Settings.WordReplacements)
+            _allWordReplacements.Add(new WordReplacementItemViewModel(kvp.Key, kvp.Value));
+        ApplyFilter();
+
+        // Замена символов
+        if (_settings.Settings.CharWordReplacements != null)
+        {
+            foreach (var kvp in _settings.Settings.CharWordReplacements)
+                _allCharWordReplacements.Add(new WordReplacementItemViewModel(kvp.Key, kvp.Value));
+        }
+        ApplyCharFilter();
+
+        // Выбор первого доступного голоса, если не сохранен
+        if (string.IsNullOrWhiteSpace(_comboBoxSelectedItemInstalledVoices))
+        {
+            _comboBoxSelectedItemInstalledVoices = ComboBoxItemSourceInstalledVoices.FirstOrDefault();
+            _settings.Settings.SelectedSingleVoice = _comboBoxSelectedItemInstalledVoices;
+        }
+    }
+
+    private void LoadVoicesList()
+    {
+        ComboBoxItemSourceInstalledVoices.Clear();
+        foreach (var voice in _voiceDiscoveryService.GetAvailableVoices())
+        {
+            ComboBoxItemSourceInstalledVoices.Add(voice);
+        }
+    }
+
+    private void LoadAvailablePiperVoices()
+    {
         string voicesFilePath = PiperVoicesData.VoicesFilePath;
         if (File.Exists(voicesFilePath))
         {
             foreach (var item in File.ReadAllLines(voicesFilePath))
             {
                 if (!string.IsNullOrWhiteSpace(item))
-                    ComboBoxItemSourceAvailablePiperVoices.Add(item);
+                    ComboBoxItemSourceAvailablePiperVoices.Add(item.Trim());
             }
         }
-        foreach (var word in _settings.Settings.ListBoxItemSourceBlackList)
-        {
-            ListBoxItemSourceBlacklist.Add(word);
-        }
-        foreach (var kvp in _settings.Settings.WordReplacements)
-        {
-            _allWordReplacements.Add(new WordReplacementItemViewModel(kvp.Key, kvp.Value));
-        }
-        ApplyFilter();
-
-        if (_settings.Settings.CharWordReplacements != null)
-        {
-            foreach (var kvp in _settings.Settings.CharWordReplacements)
-            {
-                _allCharWordReplacements.Add(new WordReplacementItemViewModel(kvp.Key, kvp.Value));
-            }
-        }
-        ApplyCharFilter();
-        if (_settings.Settings.SelectedSingleVoice == "" || _settings.Settings.SelectedSingleVoice == null)
-        {
-            try
-            {
-
-                _comboBoxSelectedItemInstalledVoices = new SpeechSynthesizer().GetInstalledVoices().FirstOrDefault()?.VoiceInfo.Name;
-            }
-            catch
-            {
-                Serilog.Log.Error("Нет голосов на компьютере");
-            }
-        }
-        if (DoNotTtsIfStartWith == "" || DoNotTtsIfStartWith == null)
-            DoNotTtsIfStartWith = "!";
-        if (SkipMessage == "" || SkipMessage == null)
-            SkipMessage = "!c";
-        if (SkipAllMessages == "" || SkipAllMessages == null)
-            SkipAllMessages = "!cв";
     }
 
-    private void AddToWordReplacement()
+    // =========================================================
+    // СВОЙСТВА ИЗМЕНЕНИЙ И СОХРАНЕНИЙ
+    // =========================================================
+
+    partial void OnComboBoxSelectedItemInstalledVoicesChanged(string? value)
     {
-        var word = TextBoxWordToReplace?.Trim();
-        var replacement = TextBoxReplacementWord?.Trim();
-
-        if (string.IsNullOrWhiteSpace(word) || string.IsNullOrWhiteSpace(replacement))
-            return;
-
-        // Поиск существующего слова без учета регистра
-        var existingKey = _settings.Settings.WordReplacements.Keys
-            .FirstOrDefault(k => string.Equals(k, word, StringComparison.OrdinalIgnoreCase));
-
-        if (existingKey != null)
-        {
-            _settings.Settings.WordReplacements.Remove(existingKey);
-        }
-
-        _settings.Settings.WordReplacements[word] = replacement;
-        _settings.DelayedSave();
-
-        var existingItem = _allWordReplacements
-            .FirstOrDefault(i => string.Equals(i.Word, word, StringComparison.OrdinalIgnoreCase));
-
-        if (existingItem != null)
-        {
-            existingItem.Word = word;
-            existingItem.Replacement = replacement;
-        }
-        else
-        {
-            _allWordReplacements.Insert(0, new WordReplacementItemViewModel(word, replacement));
-        }
-
-        TextBoxWordToReplace = string.Empty;
-        TextBoxReplacementWord = string.Empty;
-        OnPropertyChanged(nameof(TextBoxWordToReplace));
-        OnPropertyChanged(nameof(TextBoxReplacementWord));
-        ApplyFilter();
+        _settings.Settings.SelectedSingleVoice = value;
+        _ = _settings.DelayedSave();
     }
 
-    private void RemoveToWordReplacement()
+    partial void OnSliderSingleVoiceVolumeChanged(int value)
     {
-        WordReplacementItemViewModel? itemToRemove = SelectedWordReplacementItem;
+        _settings.Settings.StandardVoiceVolume = value;
+        _ = _settings.DelayedSave();
+    }
 
-        if (itemToRemove == null && !string.IsNullOrWhiteSpace(TextBoxWordToReplace))
+    partial void OnSliderSingleVoiceSpeedChanged(int value)
+    {
+        _settings.Settings.StandardVoiceSpeed = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnCheckBoxNormalizationTtsChanged(bool value)
+    {
+        _settings.Settings.CheckBoxNormalizationTts = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnSliderCompressorPowerChanged(int value)
+    {
+        _settings.Settings.CompressorPower = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnSliderMasterVolumeMultiplierChanged(double value)
+    {
+        var rounded = Math.Round(value, 1);
+        _settings.Settings.MasterVolumeMultiplier = (float)rounded;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnDoNotTtsIfStartWithChanged(string value)
+    {
+        _settings.Settings.DoNotTtsIfStartWith = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnSkipMessageChanged(string value)
+    {
+        _settings.Settings.SkipMessage = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnSkipAllMessagesChanged(string value)
+    {
+        _settings.Settings.SkipAllMessages = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnCheckBoxAllowSkipMessagesChanged(bool value)
+    {
+        _settings.Settings.CheckBoxAllowSkipMessages = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnBadWordsFilterChanged(bool value)
+    {
+        _settings.Settings.BadWordFilter = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnBadWordReplacementChanged(string? value)
+    {
+        _settings.Settings.BadWordReplacement = value;
+        _ = _settings.DelayedSave();
+    }
+
+    partial void OnSelectedPiperVoiceToDownloadChanged(string? value)
+    {
+        if (!IsPiperDownloading && IsPiperDownloadProgressVisible)
         {
-            var word = TextBoxWordToReplace.Trim();
-            itemToRemove = _allWordReplacements
-                .FirstOrDefault(i => string.Equals(i.Word, word, StringComparison.OrdinalIgnoreCase));
+            IsPiperDownloadProgressVisible = false;
+            PiperDownloadStatusText = string.Empty;
+            PiperDownloadProgressText = string.Empty;
+            PiperDownloadProgressValue = 0;
         }
+    }
 
-        if (itemToRemove == null)
-            return;
-
-        var existingKey = _settings.Settings.WordReplacements.Keys
-            .FirstOrDefault(k => string.Equals(k, itemToRemove.Word, StringComparison.OrdinalIgnoreCase));
-
-        if (existingKey != null)
-        {
-            _settings.Settings.WordReplacements.Remove(existingKey);
-            _settings.DelayedSave();
-        }
-
-        _allWordReplacements.Remove(itemToRemove);
-        SelectedWordReplacementItem = null;
-
-        TextBoxWordToReplace = string.Empty;
-        TextBoxReplacementWord = string.Empty;
-        OnPropertyChanged(nameof(TextBoxWordToReplace));
-        OnPropertyChanged(nameof(TextBoxReplacementWord));
+    partial void OnTextBoxWordToReplaceChanged(string? value)
+    {
         ApplyFilter();
     }
 
-    private void ApplyFilter()
+    partial void OnTextBoxReplacementWordChanged(string? value)
     {
-        _isFiltering = true;
-        try
+        ApplyFilter();
+    }
+
+    partial void OnSelectedWordReplacementItemChanged(WordReplacementItemViewModel? value)
+    {
+        if (value != null)
         {
-            string queryWord = _textBoxWordToReplace?.Trim() ?? string.Empty;
-            string queryRep = _textBoxReplacementWord?.Trim() ?? string.Empty;
-
-            bool hasWordQuery = !string.IsNullOrEmpty(queryWord);
-            bool hasRepQuery = !string.IsNullOrEmpty(queryRep);
-
-            FilteredWordReplacements.Clear();
-            bool anyExact = false;
-
-            foreach (var item in _allWordReplacements)
-            {
-                bool wordContains = !hasWordQuery || item.Word.Contains(queryWord, StringComparison.OrdinalIgnoreCase);
-                bool repContains = !hasRepQuery || item.Replacement.Contains(queryRep, StringComparison.OrdinalIgnoreCase);
-
-                bool isMatch;
-                if (hasWordQuery && hasRepQuery)
-                {
-                    isMatch = wordContains && repContains;
-                }
-                else if (hasWordQuery)
-                {
-                    isMatch = wordContains;
-                }
-                else if (hasRepQuery)
-                {
-                    isMatch = repContains;
-                }
-                else
-                {
-                    isMatch = true;
-                }
-
-                if (isMatch)
-                {
-                    bool isWordExact = hasWordQuery && string.Equals(item.Word, queryWord, StringComparison.OrdinalIgnoreCase);
-                    bool isRepExact = hasRepQuery && string.Equals(item.Replacement, queryRep, StringComparison.OrdinalIgnoreCase);
-
-                    item.IsWordExactMatch = isWordExact;
-                    item.IsReplacementExactMatch = isRepExact;
-
-                    if (isWordExact || isRepExact)
-                    {
-                        anyExact = true;
-                    }
-
-                    FilteredWordReplacements.Add(item);
-                }
-                else
-                {
-                    item.IsWordExactMatch = false;
-                    item.IsReplacementExactMatch = false;
-                }
-            }
-
-            IsExactMatchFound = anyExact;
-        }
-        finally
-        {
-            _isFiltering = false;
+            TextBoxWordToReplace = value.Word;
+            TextBoxReplacementWord = value.Replacement;
         }
     }
 
-    private void AddCharReplacement()
+    partial void OnTextBoxCharToFindChanged(string? value)
     {
-        var symbol = TextBoxCharToFind?.Trim();
-        var replacement = TextBoxCharReplacementWord?.Trim();
-
-        if (string.IsNullOrWhiteSpace(symbol))
-            return;
-
-        if (string.IsNullOrWhiteSpace(replacement))
-        {
-            replacement = symbol;
-        }
-
-        var existingKey = _settings.Settings.CharWordReplacements.Keys
-            .FirstOrDefault(k => string.Equals(k, symbol, StringComparison.OrdinalIgnoreCase));
-
-        if (existingKey != null)
-        {
-            _settings.Settings.CharWordReplacements.Remove(existingKey);
-        }
-
-        _settings.Settings.CharWordReplacements[symbol] = replacement;
-        _settings.DelayedSave();
-
-        var existingItem = _allCharWordReplacements
-            .FirstOrDefault(i => string.Equals(i.Word, symbol, StringComparison.OrdinalIgnoreCase));
-
-        if (existingItem != null)
-        {
-            existingItem.Word = symbol;
-            existingItem.Replacement = replacement;
-        }
-        else
-        {
-            _allCharWordReplacements.Insert(0, new WordReplacementItemViewModel(symbol, replacement));
-        }
-
-        TextBoxCharToFind = string.Empty;
-        TextBoxCharReplacementWord = string.Empty;
-        OnPropertyChanged(nameof(TextBoxCharToFind));
-        OnPropertyChanged(nameof(TextBoxCharReplacementWord));
         ApplyCharFilter();
     }
 
-    private void RemoveCharReplacement()
+    partial void OnTextBoxCharReplacementWordChanged(string? value)
     {
-        WordReplacementItemViewModel? itemToRemove = SelectedCharReplacementItem;
-
-        if (itemToRemove == null && !string.IsNullOrWhiteSpace(TextBoxCharToFind))
-        {
-            var symbol = TextBoxCharToFind.Trim();
-            itemToRemove = _allCharWordReplacements
-                .FirstOrDefault(i => string.Equals(i.Word, symbol, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (itemToRemove == null)
-            return;
-
-        var existingKey = _settings.Settings.CharWordReplacements.Keys
-            .FirstOrDefault(k => string.Equals(k, itemToRemove.Word, StringComparison.OrdinalIgnoreCase));
-
-        if (existingKey != null)
-        {
-            _settings.Settings.CharWordReplacements.Remove(existingKey);
-            _settings.DelayedSave();
-        }
-
-        _allCharWordReplacements.Remove(itemToRemove);
-        SelectedCharReplacementItem = null;
-
-        TextBoxCharToFind = string.Empty;
-        TextBoxCharReplacementWord = string.Empty;
-        OnPropertyChanged(nameof(TextBoxCharToFind));
-        OnPropertyChanged(nameof(TextBoxCharReplacementWord));
         ApplyCharFilter();
     }
 
-    private void ApplyCharFilter()
+    partial void OnSelectedCharReplacementItemChanged(WordReplacementItemViewModel? value)
     {
-        _isCharFiltering = true;
-        try
+        if (value != null)
         {
-            string querySymbol = _textBoxCharToFind?.Trim() ?? string.Empty;
-            string queryRep = _textBoxCharReplacementWord?.Trim() ?? string.Empty;
-
-            bool hasSymbolQuery = !string.IsNullOrEmpty(querySymbol);
-            bool hasRepQuery = !string.IsNullOrEmpty(queryRep);
-
-            FilteredCharWordReplacements.Clear();
-            bool anyExact = false;
-
-            foreach (var item in _allCharWordReplacements)
-            {
-                bool symbolContains = !hasSymbolQuery || item.Word.Contains(querySymbol, StringComparison.OrdinalIgnoreCase);
-                bool repContains = !hasRepQuery || item.Replacement.Contains(queryRep, StringComparison.OrdinalIgnoreCase);
-
-                bool isMatch;
-                if (hasSymbolQuery && hasRepQuery)
-                {
-                    isMatch = symbolContains && repContains;
-                }
-                else if (hasSymbolQuery)
-                {
-                    isMatch = symbolContains;
-                }
-                else if (hasRepQuery)
-                {
-                    isMatch = repContains;
-                }
-                else
-                {
-                    isMatch = true;
-                }
-
-                if (isMatch)
-                {
-                    bool isSymbolExact = hasSymbolQuery && string.Equals(item.Word, querySymbol, StringComparison.OrdinalIgnoreCase);
-                    bool isRepExact = hasRepQuery && string.Equals(item.Replacement, queryRep, StringComparison.OrdinalIgnoreCase);
-
-                    item.IsWordExactMatch = isSymbolExact;
-                    item.IsReplacementExactMatch = isRepExact;
-
-                    if (isSymbolExact || isRepExact)
-                    {
-                        anyExact = true;
-                    }
-
-                    FilteredCharWordReplacements.Add(item);
-                }
-                else
-                {
-                    item.IsWordExactMatch = false;
-                    item.IsReplacementExactMatch = false;
-                }
-            }
-
-            IsCharExactMatchFound = anyExact;
-        }
-        finally
-        {
-            _isCharFiltering = false;
+            TextBoxCharToFind = value.Word;
+            TextBoxCharReplacementWord = value.Replacement;
         }
     }
 
-    public ObservableCollection<string> ComboBoxItemSourceAvailablePiperVoices { get; set; } = new ObservableCollection<string>();
-    public ObservableCollection<string> ComboBoxItemSourceInstalledVoices
-    {
-        get => _availableVoices;
-        set { _availableVoices = value; OnPropertyChanged(); }
-    }
+    // =========================================================
+    // PIPER DOWNLOAD
+    // =========================================================
 
-    public string? ComboBoxSelectedItemInstalledVoices
-    {
-        get => _comboBoxSelectedItemInstalledVoices;
-        set
-        {
-            _comboBoxSelectedItemInstalledVoices = value;
-            OnPropertyChanged();
-            _settings.Settings.SelectedSingleVoice = value;
-            _settings.DelayedSave();
-        }
-    }
-    private int _selectedWordReplacementIndex = -1;
-    public int SelectedWordReplacementIndex
-    {
-        get => _selectedWordReplacementIndex;
-        set { _selectedWordReplacementIndex = value; OnPropertyChanged(); }
-    }
-    public string DoNotTtsIfStartWith
-    {
-        get => _settings.Settings.DoNotTtsIfStartWith;
-        set
-        {
-            _settings.Settings.DoNotTtsIfStartWith = value;
-            OnPropertyChanged();
-            _settings.DelayedSave();
-        }
-    }
-
-    public string SkipMessage
-    {
-        get => _settings.Settings.SkipMessage;
-        set
-        {
-            _settings.Settings.SkipMessage = value;
-            OnPropertyChanged();
-            _settings.DelayedSave();
-        }
-    }
-
-    public string SkipAllMessages
-    {
-        get => _settings.Settings.SkipAllMessages;
-        set
-        {
-            _settings.Settings.SkipAllMessages = value;
-            OnPropertyChanged();
-            _settings.DelayedSave();
-        }
-    }
-
-    public int SliderSingleVoiceVolume
-    {
-        get => _sliderSingleVoiceVolume;
-        set
-        {
-            _sliderSingleVoiceVolume = value;
-            OnPropertyChanged();
-            _settings.Settings.StandardVoiceVolume = value;
-            _settings.DelayedSave();
-        }
-    }
-
-    public int SliderSingleVoiceSpeed
-    {
-        get => _sliderSingleVoiceSpeed;
-        set
-        {
-            _sliderSingleVoiceSpeed = value;
-            OnPropertyChanged();
-            _settings.Settings.StandardVoiceSpeed = value;
-            _settings.DelayedSave();
-        }
-    }
-
-    public int SliderCompressorPower
-    {
-        get => _sliderCompressorPower;
-        set
-        {
-            _sliderCompressorPower = value;
-            OnPropertyChanged();
-            _settings.Settings.CompressorPower = value;
-            _settings.DelayedSave();
-        }
-    }
-
-    public double SliderMasterVolumeMultiplier
-    {
-        get => _sliderMasterVolumeMultiplier;
-        set
-        {
-            var rounded = Math.Round(value, 1);
-            if (Math.Abs(_sliderMasterVolumeMultiplier - rounded) < 0.01)
-                return;
-
-            _sliderMasterVolumeMultiplier = rounded;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(MasterVolumeMultiplierText));
-            _settings.Settings.MasterVolumeMultiplier = (float)rounded;
-            _settings.DelayedSave();
-        }
-    }
-
-    public string MasterVolumeMultiplierText => $"x{_sliderMasterVolumeMultiplier:F1}";
-
-    public string? TextBoxWordToReplace
-    {
-        get => _textBoxWordToReplace;
-        set
-        {
-            if (_textBoxWordToReplace == value)
-                return;
-            _textBoxWordToReplace = value;
-            OnPropertyChanged();
-            ApplyFilter();
-        }
-    }
-    public string? TextBoxReplacementWord
-    {
-        get => _textBoxReplacementWord;
-        set
-        {
-            if (_textBoxReplacementWord == value)
-                return;
-            _textBoxReplacementWord = value;
-            OnPropertyChanged();
-            ApplyFilter();
-        }
-    }
-    public string? TextBoxCharToFind
-    {
-        get => _textBoxCharToFind;
-        set
-        {
-            if (_textBoxCharToFind == value)
-                return;
-            _textBoxCharToFind = value;
-            OnPropertyChanged();
-            ApplyCharFilter();
-        }
-    }
-    public string? TextBoxCharReplacementWord
-    {
-        get => _textBoxCharReplacementWord;
-        set
-        {
-            if (_textBoxCharReplacementWord == value)
-                return;
-            _textBoxCharReplacementWord = value;
-            OnPropertyChanged();
-            ApplyCharFilter();
-        }
-    }
-    public string? TextBoxAddToBlackList
-    {
-        get => _textBoxAddToBlackList;
-        set { _textBoxAddToBlackList = value; }
-    }
-    public bool CheckBoxNormalizationTts
-    {
-        get => _checkBoxNormalizationTts;
-        set
-        {
-            _checkBoxNormalizationTts = value;
-            _settings.Settings.CheckBoxNormalizationTts = value;
-            _settings.DelayedSave();
-        }
-    }
-    public bool CheckBoxAllowSkipMessages
-    {
-        get => _checkBoxAllowSkipMessages;
-        set
-        {
-            _checkBoxAllowSkipMessages = value;
-            _settings.Settings.CheckBoxAllowSkipMessages = value;
-            _settings.DelayedSave();
-        }
-    }
-    private bool _isPiperDownloading;
-    public bool IsPiperDownloading
-    {
-        get => _isPiperDownloading;
-        set { _isPiperDownloading = value; OnPropertyChanged(); }
-    }
-
-    private bool _isPiperDownloadProgressVisible;
-    public bool IsPiperDownloadProgressVisible
-    {
-        get => _isPiperDownloadProgressVisible;
-        set { _isPiperDownloadProgressVisible = value; OnPropertyChanged(); }
-    }
-
-    private double _piperDownloadProgressValue;
-    public double PiperDownloadProgressValue
-    {
-        get => _piperDownloadProgressValue;
-        set { _piperDownloadProgressValue = value; OnPropertyChanged(); }
-    }
-
-    private bool _isPiperDownloadIndeterminate;
-    public bool IsPiperDownloadIndeterminate
-    {
-        get => _isPiperDownloadIndeterminate;
-        set { _isPiperDownloadIndeterminate = value; OnPropertyChanged(); }
-    }
-
-    private string _piperDownloadStatusText = string.Empty;
-    public string PiperDownloadStatusText
-    {
-        get => _piperDownloadStatusText;
-        set { _piperDownloadStatusText = value; OnPropertyChanged(); }
-    }
-
-    private string _piperDownloadProgressText = string.Empty;
-    public string PiperDownloadProgressText
-    {
-        get => _piperDownloadProgressText;
-        set { _piperDownloadProgressText = value; OnPropertyChanged(); }
-    }
-
-    private IBrush _piperDownloadStatusBrush = Brushes.Gray;
-    public IBrush PiperDownloadStatusBrush
-    {
-        get => _piperDownloadStatusBrush;
-        set { _piperDownloadStatusBrush = value; OnPropertyChanged(); }
-    }
-
-    public string? SelectedPiperVoiceToDownload
-    {
-        get => _selectedPiperVoiceToDownload;
-        set
-        {
-            _selectedPiperVoiceToDownload = value;
-            OnPropertyChanged();
-            if (!_isPiperDownloading && _isPiperDownloadProgressVisible)
-            {
-                IsPiperDownloadProgressVisible = false;
-                PiperDownloadStatusText = string.Empty;
-                PiperDownloadProgressText = string.Empty;
-                PiperDownloadProgressValue = 0;
-            }
-        }
-    }
-
-    private async void InstallPiperVoices()
+    [RelayCommand]
+    public async Task DownloadPiperVoiceAsync()
     {
         var piperVoiceName = SelectedPiperVoiceToDownload;
-        if (string.IsNullOrWhiteSpace(piperVoiceName))
-            return;
-
-        if (IsPiperDownloading)
+        if (string.IsNullOrWhiteSpace(piperVoiceName) || IsPiperDownloading)
             return;
 
         IsPiperDownloading = true;
@@ -765,9 +435,9 @@ public class TtsTabViewModel : INotifyPropertyChanged
                 PiperDownloadStatusText = "Голос успешно скачан!";
                 PiperDownloadStatusBrush = new SolidColorBrush(Color.Parse("#4CAF50"));
 
-                if (!_availableVoices.Contains(piperVoiceName))
+                if (!ComboBoxItemSourceInstalledVoices.Contains(piperVoiceName))
                 {
-                    _availableVoices.Add(piperVoiceName);
+                    ComboBoxItemSourceInstalledVoices.Add(piperVoiceName);
                 }
             }
             else if (result.Status == PiperDownloadStatus.AlreadyExists)
@@ -777,9 +447,9 @@ public class TtsTabViewModel : INotifyPropertyChanged
                 PiperDownloadStatusText = "Голос уже установлен";
                 PiperDownloadStatusBrush = new SolidColorBrush(Color.Parse("#42A5F5"));
 
-                if (!_availableVoices.Contains(piperVoiceName))
+                if (!ComboBoxItemSourceInstalledVoices.Contains(piperVoiceName))
                 {
-                    _availableVoices.Add(piperVoiceName);
+                    ComboBoxItemSourceInstalledVoices.Add(piperVoiceName);
                 }
             }
             else
@@ -794,7 +464,7 @@ public class TtsTabViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            Serilog.Log.Error(ex, "Ошибка при загрузке голоса Piper: {VoiceName}", piperVoiceName);
+            Log.Error(ex, "Ошибка при загрузке голоса Piper: {VoiceName}", piperVoiceName);
             PiperDownloadProgressValue = 0;
             PiperDownloadProgressText = "";
             PiperDownloadStatusText = "Ошибка при загрузке";
@@ -806,12 +476,12 @@ public class TtsTabViewModel : INotifyPropertyChanged
             IsPiperDownloadIndeterminate = false;
         }
     }
-    private string? _selectedBlacklistItem;
-    public string? SelectedBlacklistItem
-    {
-        get => _selectedBlacklistItem;
-        set { _selectedBlacklistItem = value; OnPropertyChanged(); }
-    }
+
+    // =========================================================
+    // BLACKLIST
+    // =========================================================
+
+    [RelayCommand]
     private void AddToBlackList()
     {
         string? username = TextBoxAddToBlackList?.Trim();
@@ -822,11 +492,13 @@ public class TtsTabViewModel : INotifyPropertyChanged
         {
             ListBoxItemSourceBlacklist.Insert(0, username);
             _settings.Settings.ListBoxItemSourceBlackList = ListBoxItemSourceBlacklist.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            _settings.DelayedSave();
+            _ = _settings.DelayedSave();
         }
 
         TextBoxAddToBlackList = string.Empty;
     }
+
+    [RelayCommand]
     private void RemoveFromBlackList()
     {
         if (SelectedBlacklistItem == null)
@@ -834,11 +506,289 @@ public class TtsTabViewModel : INotifyPropertyChanged
 
         ListBoxItemSourceBlacklist.Remove(SelectedBlacklistItem);
         _settings.Settings.ListBoxItemSourceBlackList = ListBoxItemSourceBlacklist.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        _settings.DelayedSave();
+        _ = _settings.DelayedSave();
     }
 
-    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    // =========================================================
+    // BAD WORDS WHITELIST
+    // =========================================================
+
+    [RelayCommand]
+    private void AddToBadWordFilterWhitelist()
     {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        string? word = TextBoxAddToBadWordFilterWhitelist?.Trim();
+        if (string.IsNullOrWhiteSpace(word))
+            return;
+
+        if (!ListBoxItemSourceBadWordFilterWhitelist.Any(x => string.Equals(x, word, StringComparison.OrdinalIgnoreCase)))
+        {
+            ListBoxItemSourceBadWordFilterWhitelist.Insert(0, word);
+            _settings.Settings.BadWordFilterWhitelist = ListBoxItemSourceBadWordFilterWhitelist.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _ = _settings.DelayedSave();
+        }
+
+        TextBoxAddToBadWordFilterWhitelist = string.Empty;
     }
+
+    [RelayCommand]
+    private void RemoveFromBadWordFilterWhitelist()
+    {
+        if (SelectedBadWordFilterWhitelistItem == null)
+            return;
+
+        ListBoxItemSourceBadWordFilterWhitelist.Remove(SelectedBadWordFilterWhitelistItem);
+        _settings.Settings.BadWordFilterWhitelist = ListBoxItemSourceBadWordFilterWhitelist.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _ = _settings.DelayedSave();
+    }
+
+    // =========================================================
+    // WORD REPLACEMENTS
+    // =========================================================
+
+    [RelayCommand]
+    private void AddWordReplacement()
+    {
+        var word = TextBoxWordToReplace?.Trim();
+        var replacement = TextBoxReplacementWord?.Trim();
+
+        if (string.IsNullOrWhiteSpace(word) || string.IsNullOrWhiteSpace(replacement))
+            return;
+
+        var existingKey = _settings.Settings.WordReplacements.Keys
+            .FirstOrDefault(k => string.Equals(k, word, StringComparison.OrdinalIgnoreCase));
+
+        if (existingKey != null)
+        {
+            _settings.Settings.WordReplacements.Remove(existingKey);
+        }
+
+        _settings.Settings.WordReplacements[word] = replacement;
+        _ = _settings.DelayedSave();
+
+        var existingItem = _allWordReplacements
+            .FirstOrDefault(i => string.Equals(i.Word, word, StringComparison.OrdinalIgnoreCase));
+
+        if (existingItem != null)
+        {
+            existingItem.Word = word;
+            existingItem.Replacement = replacement;
+        }
+        else
+        {
+            _allWordReplacements.Insert(0, new WordReplacementItemViewModel(word, replacement));
+        }
+
+        TextBoxWordToReplace = string.Empty;
+        TextBoxReplacementWord = string.Empty;
+        ApplyFilter();
+    }
+
+    [RelayCommand]
+    private void RemoveWordReplacement()
+    {
+        WordReplacementItemViewModel? itemToRemove = SelectedWordReplacementItem;
+
+        if (itemToRemove == null && !string.IsNullOrWhiteSpace(TextBoxWordToReplace))
+        {
+            var word = TextBoxWordToReplace.Trim();
+            itemToRemove = _allWordReplacements
+                .FirstOrDefault(i => string.Equals(i.Word, word, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (itemToRemove == null)
+            return;
+
+        var existingKey = _settings.Settings.WordReplacements.Keys
+            .FirstOrDefault(k => string.Equals(k, itemToRemove.Word, StringComparison.OrdinalIgnoreCase));
+
+        if (existingKey != null)
+        {
+            _settings.Settings.WordReplacements.Remove(existingKey);
+            _ = _settings.DelayedSave();
+        }
+
+        _allWordReplacements.Remove(itemToRemove);
+        SelectedWordReplacementItem = null;
+
+        TextBoxWordToReplace = string.Empty;
+        TextBoxReplacementWord = string.Empty;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        string queryWord = TextBoxWordToReplace?.Trim() ?? string.Empty;
+        string queryRep = TextBoxReplacementWord?.Trim() ?? string.Empty;
+
+        bool hasWordQuery = !string.IsNullOrEmpty(queryWord);
+        bool hasRepQuery = !string.IsNullOrEmpty(queryRep);
+
+        FilteredWordReplacements.Clear();
+        bool anyExact = false;
+
+        foreach (var item in _allWordReplacements)
+        {
+            bool wordContains = !hasWordQuery || item.Word.Contains(queryWord, StringComparison.OrdinalIgnoreCase);
+            bool repContains = !hasRepQuery || item.Replacement.Contains(queryRep, StringComparison.OrdinalIgnoreCase);
+
+            bool isMatch = (hasWordQuery && hasRepQuery) ? (wordContains && repContains)
+                         : hasWordQuery ? wordContains
+                         : hasRepQuery ? repContains
+                         : true;
+
+            if (isMatch)
+            {
+                bool isWordExact = hasWordQuery && string.Equals(item.Word, queryWord, StringComparison.OrdinalIgnoreCase);
+                bool isRepExact = hasRepQuery && string.Equals(item.Replacement, queryRep, StringComparison.OrdinalIgnoreCase);
+
+                item.IsWordExactMatch = isWordExact;
+                item.IsReplacementExactMatch = isRepExact;
+
+                if (isWordExact || isRepExact)
+                    anyExact = true;
+
+                FilteredWordReplacements.Add(item);
+            }
+            else
+            {
+                item.IsWordExactMatch = false;
+                item.IsReplacementExactMatch = false;
+            }
+        }
+
+        IsExactMatchFound = anyExact;
+    }
+
+    // =========================================================
+    // CHAR REPLACEMENTS
+    // =========================================================
+
+    [RelayCommand]
+    private void AddCharReplacement()
+    {
+        var symbol = TextBoxCharToFind?.Trim();
+        var replacement = TextBoxCharReplacementWord?.Trim();
+
+        if (string.IsNullOrWhiteSpace(symbol))
+            return;
+
+        if (string.IsNullOrWhiteSpace(replacement))
+            replacement = symbol;
+
+        var existingKey = _settings.Settings.CharWordReplacements.Keys
+            .FirstOrDefault(k => string.Equals(k, symbol, StringComparison.OrdinalIgnoreCase));
+
+        if (existingKey != null)
+            _settings.Settings.CharWordReplacements.Remove(existingKey);
+
+        _settings.Settings.CharWordReplacements[symbol] = replacement;
+        _ = _settings.DelayedSave();
+
+        var existingItem = _allCharWordReplacements
+            .FirstOrDefault(i => string.Equals(i.Word, symbol, StringComparison.OrdinalIgnoreCase));
+
+        if (existingItem != null)
+        {
+            existingItem.Word = symbol;
+            existingItem.Replacement = replacement;
+        }
+        else
+        {
+            _allCharWordReplacements.Insert(0, new WordReplacementItemViewModel(symbol, replacement));
+        }
+
+        TextBoxCharToFind = string.Empty;
+        TextBoxCharReplacementWord = string.Empty;
+        ApplyCharFilter();
+    }
+
+    [RelayCommand]
+    private void RemoveCharReplacement()
+    {
+        WordReplacementItemViewModel? itemToRemove = SelectedCharReplacementItem;
+
+        if (itemToRemove == null && !string.IsNullOrWhiteSpace(TextBoxCharToFind))
+        {
+            var symbol = TextBoxCharToFind.Trim();
+            itemToRemove = _allCharWordReplacements
+                .FirstOrDefault(i => string.Equals(i.Word, symbol, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (itemToRemove == null)
+            return;
+
+        var existingKey = _settings.Settings.CharWordReplacements.Keys
+            .FirstOrDefault(k => string.Equals(k, itemToRemove.Word, StringComparison.OrdinalIgnoreCase));
+
+        if (existingKey != null)
+        {
+            _settings.Settings.CharWordReplacements.Remove(existingKey);
+            _ = _settings.DelayedSave();
+        }
+
+        _allCharWordReplacements.Remove(itemToRemove);
+        SelectedCharReplacementItem = null;
+
+        TextBoxCharToFind = string.Empty;
+        TextBoxCharReplacementWord = string.Empty;
+        ApplyCharFilter();
+    }
+
+    private void ApplyCharFilter()
+    {
+        string querySymbol = TextBoxCharToFind?.Trim() ?? string.Empty;
+        string queryRep = TextBoxCharReplacementWord?.Trim() ?? string.Empty;
+
+        bool hasSymbolQuery = !string.IsNullOrEmpty(querySymbol);
+        bool hasRepQuery = !string.IsNullOrEmpty(queryRep);
+
+        FilteredCharWordReplacements.Clear();
+        bool anyExact = false;
+
+        foreach (var item in _allCharWordReplacements)
+        {
+            bool symbolContains = !hasSymbolQuery || item.Word.Contains(querySymbol, StringComparison.OrdinalIgnoreCase);
+            bool repContains = !hasRepQuery || item.Replacement.Contains(queryRep, StringComparison.OrdinalIgnoreCase);
+
+            bool isMatch = (hasSymbolQuery && hasRepQuery) ? (symbolContains && repContains)
+                         : hasSymbolQuery ? symbolContains
+                         : hasRepQuery ? repContains
+                         : true;
+
+            if (isMatch)
+            {
+                bool isSymbolExact = hasSymbolQuery && string.Equals(item.Word, querySymbol, StringComparison.OrdinalIgnoreCase);
+                bool isRepExact = hasRepQuery && string.Equals(item.Replacement, queryRep, StringComparison.OrdinalIgnoreCase);
+
+                item.IsWordExactMatch = isSymbolExact;
+                item.IsReplacementExactMatch = isRepExact;
+
+                if (isSymbolExact || isRepExact)
+                    anyExact = true;
+
+                FilteredCharWordReplacements.Add(item);
+            }
+            else
+            {
+                item.IsWordExactMatch = false;
+                item.IsReplacementExactMatch = false;
+            }
+        }
+
+        IsCharExactMatchFound = anyExact;
+    }
+
+    // =========================================================
+    // АЛИАСЫ КОМАНД ДЛЯ ПРИВЯЗОК XAML
+    // =========================================================
+
+    public IAsyncRelayCommand ButtonDownloadPiperVoice => DownloadPiperVoiceCommand;
+    public IRelayCommand ButtonAddToBlackList => AddToBlackListCommand;
+    public IRelayCommand ButtonRemoveFromBlackList => RemoveFromBlackListCommand;
+    public IRelayCommand ButtonAddToBadWordFilterWhitelist => AddToBadWordFilterWhitelistCommand;
+    public IRelayCommand ButtonRemoveFromBadWordFilterWhitelist => RemoveFromBadWordFilterWhitelistCommand;
+    public IRelayCommand ButtonAddWordReplacement => AddWordReplacementCommand;
+    public IRelayCommand ButtonRemoveWordReplacement => RemoveWordReplacementCommand;
+    public IRelayCommand ButtonAddCharReplacement => AddCharReplacementCommand;
+    public IRelayCommand ButtonRemoveCharReplacement => RemoveCharReplacementCommand;
 }

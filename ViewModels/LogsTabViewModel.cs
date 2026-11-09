@@ -1,33 +1,27 @@
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Windows.Input;
+using CommunityToolkit.Mvvm.Input;
 using TtsStreamSupporter.Services;
 using TtsStreamSupporter.Settings;
 
 namespace TtsStreamSupporter.ViewModels;
 
-public class LogsTabViewModel : INotifyPropertyChanged
+public partial class LogsTabViewModel : ViewModelBase
 {
-    public ICommand OpenLogsFolder { get; }
-    public ICommand OpenSettingsFolder { get; }
+    public ObservableCollection<string> ListBoxLogs => LoggingService.LogService.Logs;
 
-    public LogsTabViewModel()
+    [RelayCommand]
+    private void DoOpenLogsFolder()
     {
-        OpenLogsFolder = new RelayCommand(LoggingService.OpenLogFolder);
-
-        OpenSettingsFolder = new RelayCommand(DirectoryService.OpenAppDataFolder);
+        LoggingService.OpenLogFolder();
     }
 
-    public ObservableCollection<string> ListBoxLogs =>
-    LoggingService.LogService.Logs;
-    public event PropertyChangedEventHandler? PropertyChanged;
-    protected void OnPropertyChanged(
-    [CallerMemberName] string? propertyName = null)
+    [RelayCommand]
+    private void DoOpenSettingsFolder()
     {
-        PropertyChanged?.Invoke(
-            this,
-            new PropertyChangedEventArgs(propertyName));
+        DirectoryService.OpenAppDataFolder();
     }
 
+    // Алиасы для точного совпадения с существующими привязками XAML
+    public IRelayCommand OpenLogsFolder => DoOpenLogsFolderCommand;
+    public IRelayCommand OpenSettingsFolder => DoOpenSettingsFolderCommand;
 }

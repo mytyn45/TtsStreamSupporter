@@ -1,18 +1,11 @@
-using Avalonia.Media;
+using TtsStreamSupporter.ViewModels;
 
 namespace TtsStreamSupporter.Models;
 
-public class AppWarning
+public class AppWarning : AppWarningViewModel
 {
-    public string Message { get; }
-    public IBrush BackgroundBrush { get; }
-    public IBrush ForegroundBrush { get; }
-
     public AppWarning(string message, string backgroundHex = "#E65100")
+        : base(message, backgroundHex)
     {
-        Message = message;
-        BackgroundBrush = Brush.Parse(backgroundHex);
-        ForegroundBrush = Brushes.White;
     }
 }
-

@@ -1,3 +1,4 @@
+namespace TtsStreamSupporter.Models;
 
 public class AudioEffectSettings
 {
