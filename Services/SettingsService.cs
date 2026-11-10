@@ -123,9 +123,6 @@ public class SettingsService
                 if (Settings.ListBoxItemSourceBlackList == null)
                     Settings.ListBoxItemSourceBlackList = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                if (Settings.BadWordFilterWhitelist == null)
-                    Settings.BadWordFilterWhitelist = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
                 if (Settings.WordReplacements == null)
                     Settings.WordReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 

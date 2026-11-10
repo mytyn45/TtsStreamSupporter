@@ -101,23 +101,7 @@ public partial class TtsTabViewModel : ViewModelBase
     [ObservableProperty]
     private bool _checkBoxAllowSkipMessages;
 
-    // =========================================================
-    // ФИЛЬТР МАТА
-    // =========================================================
 
-    [ObservableProperty]
-    private bool _badWordsFilter;
-
-    [ObservableProperty]
-    private string? _badWordReplacement = "***";
-
-    [ObservableProperty]
-    private string? _textBoxAddToBadWordFilterWhitelist;
-
-    [ObservableProperty]
-    private string? _selectedBadWordFilterWhitelistItem;
-
-    public ObservableCollection<string> ListBoxItemSourceBadWordFilterWhitelist { get; } = new();
 
     // =========================================================
     // ЧЁРНЫЙ СПИСОК
@@ -195,8 +179,6 @@ public partial class TtsTabViewModel : ViewModelBase
         ComboBoxSelectedItemInstalledVoices = _settings.Settings.SelectedSingleVoice;
         CheckBoxNormalizationTts = _settings.Settings.CheckBoxNormalizationTts;
         CheckBoxAllowSkipMessages = _settings.Settings.CheckBoxAllowSkipMessages;
-        BadWordsFilter = _settings.Settings.BadWordFilter;
-        BadWordReplacement = _settings.Settings.BadWordReplacement;
 
         if (!string.IsNullOrEmpty(_settings.Settings.DoNotTtsIfStartWith))
             _doNotTtsIfStartWith = _settings.Settings.DoNotTtsIfStartWith;
@@ -211,13 +193,6 @@ public partial class TtsTabViewModel : ViewModelBase
         // Черный список
         foreach (var user in _settings.Settings.ListBoxItemSourceBlackList)
             ListBoxItemSourceBlacklist.Add(user);
-
-        // Белый список фильтра мата
-        if (_settings.Settings.BadWordFilterWhitelist != null)
-        {
-            foreach (var word in _settings.Settings.BadWordFilterWhitelist)
-                ListBoxItemSourceBadWordFilterWhitelist.Add(word);
-        }
 
         // Замена слов
         foreach (var kvp in _settings.Settings.WordReplacements)
@@ -327,17 +302,6 @@ public partial class TtsTabViewModel : ViewModelBase
         _ = _settings.DelayedSave();
     }
 
-    partial void OnBadWordsFilterChanged(bool value)
-    {
-        _settings.Settings.BadWordFilter = value;
-        _ = _settings.DelayedSave();
-    }
-
-    partial void OnBadWordReplacementChanged(string? value)
-    {
-        _settings.Settings.BadWordReplacement = value;
-        _ = _settings.DelayedSave();
-    }
 
     partial void OnSelectedPiperVoiceToDownloadChanged(string? value)
     {
@@ -360,15 +324,6 @@ public partial class TtsTabViewModel : ViewModelBase
         ApplyFilter();
     }
 
-    partial void OnSelectedWordReplacementItemChanged(WordReplacementItemViewModel? value)
-    {
-        if (value != null)
-        {
-            TextBoxWordToReplace = value.Word;
-            TextBoxReplacementWord = value.Replacement;
-        }
-    }
-
     partial void OnTextBoxCharToFindChanged(string? value)
     {
         ApplyCharFilter();
@@ -379,13 +334,42 @@ public partial class TtsTabViewModel : ViewModelBase
         ApplyCharFilter();
     }
 
-    partial void OnSelectedCharReplacementItemChanged(WordReplacementItemViewModel? value)
+    [RelayCommand]
+    public void PopulateWordReplacementInputs(WordReplacementItemViewModel? item)
     {
-        if (value != null)
+        if (item != null)
         {
-            TextBoxCharToFind = value.Word;
-            TextBoxCharReplacementWord = value.Replacement;
+            SelectedWordReplacementItem = item;
+            TextBoxWordToReplace = item.Word;
+            TextBoxReplacementWord = item.Replacement;
         }
+    }
+
+    [RelayCommand]
+    public void PopulateCharReplacementInputs(WordReplacementItemViewModel? item)
+    {
+        if (item != null)
+        {
+            SelectedCharReplacementItem = item;
+            TextBoxCharToFind = item.Word;
+            TextBoxCharReplacementWord = item.Replacement;
+        }
+    }
+
+    [RelayCommand]
+    private void ClearWordReplacementInputs()
+    {
+        TextBoxWordToReplace = string.Empty;
+        TextBoxReplacementWord = string.Empty;
+        SelectedWordReplacementItem = null;
+    }
+
+    [RelayCommand]
+    private void ClearCharReplacementInputs()
+    {
+        TextBoxCharToFind = string.Empty;
+        TextBoxCharReplacementWord = string.Empty;
+        SelectedCharReplacementItem = null;
     }
 
     // =========================================================
@@ -509,37 +493,6 @@ public partial class TtsTabViewModel : ViewModelBase
         _ = _settings.DelayedSave();
     }
 
-    // =========================================================
-    // BAD WORDS WHITELIST
-    // =========================================================
-
-    [RelayCommand]
-    private void AddToBadWordFilterWhitelist()
-    {
-        string? word = TextBoxAddToBadWordFilterWhitelist?.Trim();
-        if (string.IsNullOrWhiteSpace(word))
-            return;
-
-        if (!ListBoxItemSourceBadWordFilterWhitelist.Any(x => string.Equals(x, word, StringComparison.OrdinalIgnoreCase)))
-        {
-            ListBoxItemSourceBadWordFilterWhitelist.Insert(0, word);
-            _settings.Settings.BadWordFilterWhitelist = ListBoxItemSourceBadWordFilterWhitelist.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            _ = _settings.DelayedSave();
-        }
-
-        TextBoxAddToBadWordFilterWhitelist = string.Empty;
-    }
-
-    [RelayCommand]
-    private void RemoveFromBadWordFilterWhitelist()
-    {
-        if (SelectedBadWordFilterWhitelistItem == null)
-            return;
-
-        ListBoxItemSourceBadWordFilterWhitelist.Remove(SelectedBadWordFilterWhitelistItem);
-        _settings.Settings.BadWordFilterWhitelist = ListBoxItemSourceBadWordFilterWhitelist.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        _ = _settings.DelayedSave();
-    }
 
     // =========================================================
     // WORD REPLACEMENTS
@@ -785,10 +738,10 @@ public partial class TtsTabViewModel : ViewModelBase
     public IAsyncRelayCommand ButtonDownloadPiperVoice => DownloadPiperVoiceCommand;
     public IRelayCommand ButtonAddToBlackList => AddToBlackListCommand;
     public IRelayCommand ButtonRemoveFromBlackList => RemoveFromBlackListCommand;
-    public IRelayCommand ButtonAddToBadWordFilterWhitelist => AddToBadWordFilterWhitelistCommand;
-    public IRelayCommand ButtonRemoveFromBadWordFilterWhitelist => RemoveFromBadWordFilterWhitelistCommand;
     public IRelayCommand ButtonAddWordReplacement => AddWordReplacementCommand;
     public IRelayCommand ButtonRemoveWordReplacement => RemoveWordReplacementCommand;
+    public IRelayCommand ButtonClearWordReplacementInputs => ClearWordReplacementInputsCommand;
     public IRelayCommand ButtonAddCharReplacement => AddCharReplacementCommand;
     public IRelayCommand ButtonRemoveCharReplacement => RemoveCharReplacementCommand;
+    public IRelayCommand ButtonClearCharReplacementInputs => ClearCharReplacementInputsCommand;
 }

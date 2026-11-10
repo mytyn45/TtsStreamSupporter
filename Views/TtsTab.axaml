@@ -4,28 +4,172 @@
              x:Class="TtsStreamSupporter.Views.TtsTab"
              x:DataType="vm:TtsTabViewModel">
 
+    <UserControl.Styles>
+        <!-- Карточка-секция -->
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="#FAFAFA"/>
+            <Setter Property="BorderBrush" Value="#E2E2E2"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="10"/>
+        </Style>
+
+        <!-- Заголовок карточки -->
+        <Style Selector="TextBlock.cardHeader">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#333333"/>
+        </Style>
+
+        <!-- Подзаголовок/метка -->
+        <Style Selector="TextBlock.subHeader">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#555555"/>
+        </Style>
+
+        <!-- Подвкладки списков -->
+        <Style Selector="TabControl.subTabs TabItem">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="CornerRadius" Value="6,6,0,0"/>
+            <Setter Property="BorderThickness" Value="1,1,1,0"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+        <Style Selector="TabControl.subTabs TabItem:selected">
+            <Setter Property="Background" Value="#EFF5DC"/>
+            <Setter Property="BorderBrush" Value="#D4E4B8"/>
+            <Setter Property="Foreground" Value="#1A3300"/>
+        </Style>
+    </UserControl.Styles>
+
     <ScrollViewer x:Name="TtsScrollViewer"
                   VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled"
                   IsScrollInertiaEnabled="True">
 
-        <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10" Margin="10">
+        <Grid ColumnDefinitions="360,*" ColumnSpacing="10" Margin="8">
 
-            <!-- ================= первый ряд ================= -->
-            <Grid Grid.Row="0" ColumnDefinitions="*,*,*" ColumnSpacing="10">
-                <!-- Голоса -->
-                <Border Grid.Column="0"
-                        BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
-                        Padding="12">
-                    <StackPanel Spacing="10">
+            <!-- ================= ЛЕВАЯ КОЛОНКА (Озвучка, Эффекты, Команды, Piper) ================= -->
+            <StackPanel Grid.Column="0" Spacing="8">
 
-                        <TextBlock Text="Голоса" FontWeight="Bold" FontSize="14"/>
+                <!-- Карточка 1: Голос и Звуковые эффекты -->
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Озвучка и эффекты" Classes="cardHeader"/>
 
-                        <StackPanel Spacing="4">
-                            <Label Content="Выбор голоса" Padding="0"/>
-                            <ComboBox ItemsSource="{Binding ComboBoxItemSourceInstalledVoices}"
-                                      SelectedItem="{Binding ComboBoxSelectedItemInstalledVoices}"
-                                      ToolTip.Tip="{Binding ComboBoxSelectedItemInstalledVoices}"
+                        <!-- Выбор голоса -->
+                        <ComboBox ItemsSource="{Binding ComboBoxItemSourceInstalledVoices}"
+                                  SelectedItem="{Binding ComboBoxSelectedItemInstalledVoices}"
+                                  ToolTip.Tip="{Binding ComboBoxSelectedItemInstalledVoices}"
+                                  HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+
+                        <!-- Слайдеры голоса в компактном Grid -->
+                        <Grid ColumnDefinitions="75,*,35" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="6">
+                            <!-- Громкость -->
+                            <Label Grid.Row="0" Grid.Column="0" Content="Громкость" VerticalAlignment="Center" Padding="0"/>
+                            <Slider Grid.Row="0" Grid.Column="1"
+                                    ToolTip.Tip="Громкость (0-100)"
+                                    Value="{Binding SliderSingleVoiceVolume}"
+                                    Minimum="0" Maximum="100"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2"
+                                       Text="{Binding SliderSingleVoiceVolume}"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right"
+                                       FontWeight="SemiBold" FontSize="12"/>
+
+                            <!-- Скорость -->
+                            <Label Grid.Row="1" Grid.Column="0" Content="Скорость" VerticalAlignment="Center" Padding="0"/>
+                            <Slider Grid.Row="1" Grid.Column="1"
+                                    ToolTip.Tip="Скорость (-10 - +10)"
+                                    Value="{Binding SliderSingleVoiceSpeed}"
+                                    Minimum="-10" Maximum="10"/>
+                            <TextBlock Grid.Row="1" Grid.Column="2"
+                                       Text="{Binding SliderSingleVoiceSpeed}"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right"
+                                       FontWeight="SemiBold" FontSize="12"/>
+                        </Grid>
+
+                        <Separator Height="1" Background="#E6E6E6" Margin="0,2"/>
+
+                        <!-- Звуковые эффекты -->
+                        <TextBlock Text="Звуковые эффекты" Classes="subHeader"/>
+
+                        <Grid ColumnDefinitions="85,*,40" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="6">
+                            <!-- Компрессор -->
+                            <CheckBox Grid.Row="0" Grid.Column="0" Content="Компрессор"
+                                      IsChecked="{Binding CheckBoxNormalizationTts}"
+                                      Padding="4,0,0,0" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="0" Grid.Column="1"
+                                    ToolTip.Tip="Сила компрессора (0-10)"
+                                    Value="{Binding SliderCompressorPower}"
+                                    Minimum="0" Maximum="10"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2"
+                                       Text="{Binding SliderCompressorPower}"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right"
+                                       FontWeight="SemiBold" FontSize="12"/>
+
+                            <!-- Усиление -->
+                            <Label Grid.Row="1" Grid.Column="0" Content="Усиление" VerticalAlignment="Center" Padding="0"/>
+                            <Slider Grid.Row="1" Grid.Column="1"
+                                    ToolTip.Tip="Множитель громкости (1x - 10x)"
+                                    Value="{Binding SliderMasterVolumeMultiplier}"
+                                    Minimum="1" Maximum="10"
+                                    SmallChange="0.5" LargeChange="1"/>
+                            <TextBlock Grid.Row="1" Grid.Column="2"
+                                       Text="{Binding MasterVolumeMultiplierText}"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right"
+                                       FontWeight="SemiBold" FontSize="12"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Карточка 2: Команды чата -->
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="Команды чата" Classes="cardHeader" VerticalAlignment="Center"/>
+                            <CheckBox Grid.Column="1" Content="Пропуск вкл."
+                                      IsChecked="{Binding CheckBoxAllowSkipMessages}"
+                                      VerticalAlignment="Center" Padding="4,0,0,0"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,110" RowDefinitions="Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="8">
+                            <Label Grid.Row="0" Grid.Column="0" Content="Не озвучивать с" VerticalAlignment="Center" Padding="0"/>
+                            <TextBox Grid.Row="0" Grid.Column="1"
+                                     Text="{Binding DoNotTtsIfStartWith}"
+                                     PlaceholderText="!" Height="28"/>
+
+                            <Label Grid.Row="1" Grid.Column="0" Content="Пропуск 1 сообщ." VerticalAlignment="Center" Padding="0"/>
+                            <TextBox Grid.Row="1" Grid.Column="1"
+                                     Text="{Binding SkipMessage}"
+                                     PlaceholderText="!c" Height="28"/>
+
+                            <Label Grid.Row="2" Grid.Column="0" Content="Пропуск всех сообщ." VerticalAlignment="Center" Padding="0"/>
+                            <TextBox Grid.Row="2" Grid.Column="1"
+                                     Text="{Binding SkipAllMessages}"
+                                     PlaceholderText="!cв" Height="28"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Карточка 3: Piper голоса -->
+                <Border Classes="card">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Piper голоса" Classes="cardHeader"/>
+
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                            <ComboBox Grid.Column="0"
+                                      ItemsSource="{Binding ComboBoxItemSourceAvailablePiperVoices}"
+                                      SelectedItem="{Binding SelectedPiperVoiceToDownload}"
+                                      IsEnabled="{Binding !IsPiperDownloading}"
                                       HorizontalAlignment="Stretch">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
@@ -33,524 +177,328 @@
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
-                        </StackPanel>
+                            <Button Grid.Column="1"
+                                    Content="Скачать"
+                                    Command="{Binding ButtonDownloadPiperVoice}"
+                                    IsEnabled="{Binding !IsPiperDownloading}"/>
+                        </Grid>
 
-                        <StackPanel Spacing="4">
-                            <Grid ColumnDefinitions="*,30">
-                                <Label Grid.Column="0" Content="Громкость" Padding="0"/>
-                                <Label Grid.Column="1" Content="{Binding SliderSingleVoiceVolume}"
-                                       Padding="0" HorizontalContentAlignment="Right"/>
+                        <!-- Прогресс загрузки -->
+                        <StackPanel Spacing="2" IsVisible="{Binding IsPiperDownloadProgressVisible}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding PiperDownloadStatusText}"
+                                           FontSize="11"
+                                           Foreground="{Binding PiperDownloadStatusBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding PiperDownloadProgressText}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
                             </Grid>
-                            <Slider ToolTip.Tip="Громкость (0-100)"
-                                    Value="{Binding SliderSingleVoiceVolume}"
-                                    Minimum="0" Maximum="100"
-                                    HorizontalAlignment="Stretch"/>
+                            <ProgressBar Value="{Binding PiperDownloadProgressValue}"
+                                         Minimum="0" Maximum="100"
+                                         Height="4"
+                                         CornerRadius="2"
+                                         IsIndeterminate="{Binding IsPiperDownloadIndeterminate}"/>
                         </StackPanel>
-
-                        <StackPanel Spacing="4">
-                            <Grid ColumnDefinitions="*,30">
-                                <Label Grid.Column="0" Content="Скорость" Padding="0"/>
-                                <Label Grid.Column="1" Content="{Binding SliderSingleVoiceSpeed}"
-                                       Padding="0" HorizontalContentAlignment="Right"/>
-                            </Grid>
-                            <Slider ToolTip.Tip="Скорость (-10 - +10)"
-                                    Value="{Binding SliderSingleVoiceSpeed}"
-                                    Minimum="-10" Maximum="10"
-                                    HorizontalAlignment="Stretch"/>
-                        </StackPanel>
-
                     </StackPanel>
                 </Border>
 
-                <!-- Колонка 1: Piper голоса и Звуковые эффекты -->
-                <StackPanel Grid.Column="1" Spacing="10" VerticalAlignment="Top">
+            </StackPanel>
 
-                    <!-- Piper голоса -->
-                    <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
-                            Padding="12">
-                        <StackPanel Spacing="10">
+            <!-- ================= ПРАВАЯ КОЛОНКА (Списки: Замена слов, Замена символов, Чёрный список) ================= -->
+            <Border Grid.Column="1" Classes="card" Padding="8">
+                <TabControl Classes="subTabs">
 
-                            <TextBlock Text="Piper голоса" FontWeight="Bold" FontSize="14"/>
-
-                            <StackPanel Spacing="4">
-                                <Label Content="Доступные голоса для загрузки" Padding="0"/>
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                    <ComboBox Grid.Column="0"
-                                              ItemsSource="{Binding ComboBoxItemSourceAvailablePiperVoices}"
-                                              SelectedItem="{Binding SelectedPiperVoiceToDownload}"
-                                              IsEnabled="{Binding !IsPiperDownloading}"
-                                              HorizontalAlignment="Stretch">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis"/>
-                                            </DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                    <Button Grid.Column="1"
-                                            Content="Скачать"
-                                            Command="{Binding ButtonDownloadPiperVoice}"
-                                            IsEnabled="{Binding !IsPiperDownloading}"/>
-                                </Grid>
-                            </StackPanel>
-
-                            <!-- Состояние загрузки Piper -->
-                            <StackPanel Spacing="4" IsVisible="{Binding IsPiperDownloadProgressVisible}">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding PiperDownloadStatusText}"
-                                               FontSize="12"
-                                               Foreground="{Binding PiperDownloadStatusBrush}"
-                                               TextTrimming="CharacterEllipsis"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding PiperDownloadProgressText}"
-                                               FontSize="12"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center"/>
-                                </Grid>
-                                <ProgressBar Value="{Binding PiperDownloadProgressValue}"
-                                             Minimum="0" Maximum="100"
-                                             Height="6"
-                                             CornerRadius="3"
-                                             IsIndeterminate="{Binding IsPiperDownloadIndeterminate}"/>
-                            </StackPanel>
-
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Звуковые эффекты -->
-                    <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
-                            Padding="12">
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="Звуковые эффекты" FontWeight="Bold" FontSize="14"/>
-
-                            <!-- Компрессор -->
-                            <StackPanel Spacing="4">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <CheckBox Grid.Column="0" Content="Компрессор"
-                                              IsChecked="{Binding CheckBoxNormalizationTts}"
-                                              Padding="6,0,0,0"/>
-                                    <Label Grid.Column="1" Content="{Binding SliderCompressorPower}"
-                                           Padding="0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Slider ToolTip.Tip="Сила компрессора (0-10)"
-                                        Value="{Binding SliderCompressorPower}"
-                                        Minimum="0" Maximum="10"
-                                        HorizontalAlignment="Stretch"/>
-                            </StackPanel>
-
-                            <!-- Усиление громкости готового сообщения -->
-                            <StackPanel Spacing="4">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <Label Grid.Column="0" Content="Усиление громкости" Padding="0" VerticalAlignment="Center"/>
-                                    <Label Grid.Column="1" Content="{Binding MasterVolumeMultiplierText}"
-                                           Padding="0" HorizontalContentAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                                </Grid>
-                                <Slider ToolTip.Tip="Множитель громкости готового сообщения (1x - 10x)"
-                                        Value="{Binding SliderMasterVolumeMultiplier}"
-                                        Minimum="1" Maximum="10"
-                                        SmallChange="0.5" LargeChange="1"
-                                        HorizontalAlignment="Stretch"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                </StackPanel>
-
-                <!-- Команды чата и Фильтр мата -->
-                <StackPanel Grid.Column="2" Spacing="10" VerticalAlignment="Top">
-
-                    <!-- Команды чата -->
-                    <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
-                            Padding="12">
-                        <StackPanel Spacing="10">
-
-                            <TextBlock Text="Команды чата" FontWeight="Bold" FontSize="14"/>
-
-                            <Grid ColumnDefinitions="*,Auto"
-                                  RowDefinitions="Auto,Auto,Auto,Auto"
-                                  ColumnSpacing="10" RowSpacing="10">
-
-                                <Label Grid.Column="0" Grid.Row="0"
-                                       Content="Не озвучивать если начинается с"
-                                       VerticalAlignment="Center" Padding="0"/>
-                                <TextBox Grid.Column="1" Grid.Row="0"
-                                         Text="{Binding DoNotTtsIfStartWith}"/>
-
-                                <Label Grid.Column="0" Grid.Row="1"
-                                       Content="Пропуск одного сообщения"
-                                       VerticalAlignment="Center" Padding="0"/>
-                                <TextBox Grid.Column="1" Grid.Row="1"
-                                         Text="{Binding SkipMessage}"/>
-
-                                <Label Grid.Column="0" Grid.Row="2"
-                                       Content="Пропустить все сообщения"
-                                       VerticalAlignment="Center" Padding="0"/>
-                                <TextBox Grid.Column="1" Grid.Row="2"
-                                         Text="{Binding SkipAllMessages}"/>
-                                <CheckBox Content="Включить" Grid.Row="3" IsChecked="{Binding CheckBoxAllowSkipMessages}"></CheckBox>
-                            </Grid>
-
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Фильтр мата -->
-                    <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
-                            Padding="12">
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="Фильтр мата" FontWeight="Bold" FontSize="14"/>
-                            <CheckBox Content="Включить" IsChecked="{Binding BadWordsFilter}"/>
-
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                <Label Grid.Column="0"
-                                       Content="Во что изменять мат"
-                                       VerticalAlignment="Center" Padding="0"/>
-                                <TextBox Grid.Column="1"
-                                         MinWidth="140"
-                                         Text="{Binding BadWordReplacement}"
-                                         PlaceholderText="например: ***"/>
-                            </Grid>
-
-                            <TextBlock Text="Не заменять слова:" FontWeight="SemiBold"/>
-
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <!-- Вкладка 1: Замена слов -->
+                    <TabItem Header="Замена слов">
+                        <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="6" Margin="0,6,0,0">
+                            <!-- Форма ввода -->
+                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,*,Auto,Auto" ColumnSpacing="6">
                                 <TextBox Grid.Column="0"
-                                         Text="{Binding TextBoxAddToBadWordFilterWhitelist}"
-                                         PlaceholderText="Слово для исключения"/>
+                                         PlaceholderText="Слово"
+                                         Text="{Binding TextBoxWordToReplace}"/>
+                                <Button Grid.Column="1"
+                                        Content="✕"
+                                        ToolTip.Tip="Очистить поля"
+                                        Command="{Binding ButtonClearWordReplacementInputs}"
+                                        VerticalAlignment="Center"
+                                        Padding="8,5"/>
+                                <TextBox Grid.Column="2"
+                                         PlaceholderText="Замена"
+                                         Text="{Binding TextBoxReplacementWord}"/>
+                                <Button Grid.Column="3"
+                                        Content="Добавить"
+                                        Command="{Binding ButtonAddWordReplacement}"/>
+                                <Button Grid.Column="4"
+                                        Content="Удалить"
+                                        Command="{Binding ButtonRemoveWordReplacement}"/>
+                            </Grid>
+
+                            <!-- Оповещение о совпадении -->
+                            <Border Grid.Row="1"
+                                    Background="#E3F2FD"
+                                    BorderBrush="#2196F3"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="6,3"
+                                    IsVisible="{Binding IsExactMatchFound}">
+                                <TextBlock Text="Такое слово уже есть в правилах"
+                                           Foreground="#1976D2"
+                                           FontWeight="Bold"
+                                           FontSize="12"/>
+                            </Border>
+
+                            <!-- Заголовки колонок -->
+                            <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="4">
+                                <TextBlock Grid.Column="0" Text="Слово" FontWeight="SemiBold" Opacity="0.7" Margin="6,0"/>
+                                <TextBlock Grid.Column="1" Text="Замена" FontWeight="SemiBold" Opacity="0.7" Margin="6,0"/>
+                            </Grid>
+
+                            <!-- Список -->
+                            <Border Grid.Row="3"
+                                    BorderBrush="#E0E0E0" BorderThickness="1"
+                                    CornerRadius="4"
+                                    ClipToBounds="True">
+                                <ListBox ItemsSource="{Binding FilteredWordReplacements}"
+                                         SelectedItem="{Binding SelectedWordReplacementItem}"
+                                         DoubleTapped="OnWordReplacementsDoubleTapped"
+                                         MinHeight="280"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.IsScrollInertiaEnabled="True">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:WordReplacementItemViewModel">
+                                            <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                                                <!-- Слово -->
+                                                <Border Grid.Column="0"
+                                                        Background="{Binding WordBackground}"
+                                                        BorderBrush="{Binding WordBorderBrush}"
+                                                        BorderThickness="{Binding WordBorderThickness}"
+                                                        CornerRadius="4"
+                                                        Padding="6,3">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Word}"
+                                                                   FontWeight="{Binding WordFontWeight}"
+                                                                   Foreground="{Binding WordForeground}"
+                                                                   VerticalAlignment="Center"
+                                                                   TextWrapping="Wrap"/>
+                                                        <Border Grid.Column="1"
+                                                                IsVisible="{Binding IsWordExactMatch}"
+                                                                Background="#1976D2"
+                                                                CornerRadius="3"
+                                                                Margin="4,0,0,0"
+                                                                Padding="4,1">
+                                                            <TextBlock Text="Уже есть"
+                                                                       FontSize="10"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="White"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+
+                                                <!-- Замена -->
+                                                <Border Grid.Column="1"
+                                                        Background="{Binding ReplacementBackground}"
+                                                        BorderBrush="{Binding ReplacementBorderBrush}"
+                                                        BorderThickness="{Binding ReplacementBorderThickness}"
+                                                        CornerRadius="4"
+                                                        Padding="6,3">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Replacement}"
+                                                                   FontWeight="{Binding ReplacementFontWeight}"
+                                                                   Foreground="{Binding ReplacementForeground}"
+                                                                   VerticalAlignment="Center"
+                                                                   TextWrapping="Wrap"/>
+                                                        <Border Grid.Column="1"
+                                                                IsVisible="{Binding IsReplacementExactMatch}"
+                                                                Background="#1976D2"
+                                                                CornerRadius="3"
+                                                                Margin="4,0,0,0"
+                                                                Padding="4,1">
+                                                            <TextBlock Text="Уже есть"
+                                                                       FontSize="10"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="White"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- Вкладка 2: Замена символов -->
+                    <TabItem Header="Замена символов">
+                        <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="6" Margin="0,6,0,0">
+                            <!-- Форма ввода -->
+                            <Grid Grid.Row="0" ColumnDefinitions="90,Auto,*,Auto,Auto" ColumnSpacing="6">
+                                <TextBox Grid.Column="0"
+                                         PlaceholderText="Символ"
+                                         Text="{Binding TextBoxCharToFind}"/>
+                                <Button Grid.Column="1"
+                                        Content="✕"
+                                        ToolTip.Tip="Очистить поля"
+                                        Command="{Binding ButtonClearCharReplacementInputs}"
+                                        VerticalAlignment="Center"
+                                        Padding="8,5"/>
+                                <TextBox Grid.Column="2"
+                                         PlaceholderText="Замена всего слова"
+                                         Text="{Binding TextBoxCharReplacementWord}"/>
+                                <Button Grid.Column="3"
+                                        Content="Добавить"
+                                        Command="{Binding ButtonAddCharReplacement}"/>
+                                <Button Grid.Column="4"
+                                        Content="Удалить"
+                                        Command="{Binding ButtonRemoveCharReplacement}"/>
+                            </Grid>
+
+                            <!-- Оповещение о совпадении -->
+                            <Border Grid.Row="1"
+                                    Background="#E3F2FD"
+                                    BorderBrush="#2196F3"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="6,3"
+                                    IsVisible="{Binding IsCharExactMatchFound}">
+                                <TextBlock Text="Такой символ уже есть в правилах"
+                                           Foreground="#1976D2"
+                                           FontWeight="Bold"
+                                           FontSize="12"/>
+                            </Border>
+
+                            <!-- Заголовки колонок -->
+                            <Grid Grid.Row="2" ColumnDefinitions="90,*" ColumnSpacing="4">
+                                <TextBlock Grid.Column="0" Text="Символ" FontWeight="SemiBold" Opacity="0.7" Margin="6,0"/>
+                                <TextBlock Grid.Column="1" Text="Замена всего слова на" FontWeight="SemiBold" Opacity="0.7" Margin="6,0"/>
+                            </Grid>
+
+                            <!-- Список -->
+                            <Border Grid.Row="3"
+                                    BorderBrush="#E0E0E0" BorderThickness="1"
+                                    CornerRadius="4"
+                                    ClipToBounds="True">
+                                <ListBox ItemsSource="{Binding FilteredCharWordReplacements}"
+                                         SelectedItem="{Binding SelectedCharReplacementItem}"
+                                         DoubleTapped="OnCharReplacementsDoubleTapped"
+                                         MinHeight="280"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.IsScrollInertiaEnabled="True">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:WordReplacementItemViewModel">
+                                            <Grid ColumnDefinitions="90,*" ColumnSpacing="4">
+                                                <!-- Символ -->
+                                                <Border Grid.Column="0"
+                                                        Background="{Binding WordBackground}"
+                                                        BorderBrush="{Binding WordBorderBrush}"
+                                                        BorderThickness="{Binding WordBorderThickness}"
+                                                        CornerRadius="4"
+                                                        Padding="6,3">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Word}"
+                                                                   FontWeight="{Binding WordFontWeight}"
+                                                                   Foreground="{Binding WordForeground}"
+                                                                   VerticalAlignment="Center"
+                                                                   TextWrapping="Wrap"/>
+                                                        <Border Grid.Column="1"
+                                                                IsVisible="{Binding IsWordExactMatch}"
+                                                                Background="#1976D2"
+                                                                CornerRadius="3"
+                                                                Margin="4,0,0,0"
+                                                                Padding="4,1">
+                                                            <TextBlock Text="Уже есть"
+                                                                       FontSize="10"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="White"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+
+                                                <!-- Замена -->
+                                                <Border Grid.Column="1"
+                                                        Background="{Binding ReplacementBackground}"
+                                                        BorderBrush="{Binding ReplacementBorderBrush}"
+                                                        BorderThickness="{Binding ReplacementBorderThickness}"
+                                                        CornerRadius="4"
+                                                        Padding="6,3">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Replacement}"
+                                                                   FontWeight="{Binding ReplacementFontWeight}"
+                                                                   Foreground="{Binding ReplacementForeground}"
+                                                                   VerticalAlignment="Center"
+                                                                   TextWrapping="Wrap"/>
+                                                        <Border Grid.Column="1"
+                                                                IsVisible="{Binding IsReplacementExactMatch}"
+                                                                Background="#1976D2"
+                                                                CornerRadius="3"
+                                                                Margin="4,0,0,0"
+                                                                Padding="4,1">
+                                                            <TextBlock Text="Уже есть"
+                                                                       FontSize="10"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="White"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- Вкладка 3: Чёрный список -->
+                    <TabItem Header="Чёрный список">
+                        <Grid RowDefinitions="Auto,*" RowSpacing="6" Margin="0,6,0,0">
+                            <!-- Форма ввода -->
+                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                                <TextBox Grid.Column="0"
+                                         PlaceholderText="Никнейм пользователя"
+                                         Text="{Binding TextBoxAddToBlackList}"/>
                                 <Button Grid.Column="1"
                                         Content="Добавить"
-                                        Command="{Binding ButtonAddToBadWordFilterWhitelist}"/>
+                                        Command="{Binding ButtonAddToBlackList}"/>
+                                <Button Grid.Column="2"
+                                        Content="Удалить"
+                                        Command="{Binding ButtonRemoveFromBlackList}"/>
                             </Grid>
 
-                            <Border BorderBrush="LightGray" BorderThickness="1" ClipToBounds="True">
-                                <ListBox ItemsSource="{Binding ListBoxItemSourceBadWordFilterWhitelist}"
-                                         SelectedItem="{Binding SelectedBadWordFilterWhitelistItem}"
-                                         Height="120"
+                            <!-- Список -->
+                            <Border Grid.Row="1"
+                                    BorderBrush="#E0E0E0" BorderThickness="1"
+                                    CornerRadius="4"
+                                    ClipToBounds="True">
+                                <ListBox ItemsSource="{Binding ListBoxItemSourceBlacklist}"
+                                         SelectedItem="{Binding SelectedBlacklistItem}"
+                                         MinHeight="280"
                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                          ScrollViewer.IsScrollInertiaEnabled="True">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding}" Padding="4,2" TextWrapping="Wrap"/>
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
                             </Border>
-
-                            <Button Content="Удалить"
-                                    Command="{Binding ButtonRemoveFromBadWordFilterWhitelist}"
-                                    HorizontalAlignment="Left"/>
-                        </StackPanel>
-                    </Border>
-
-                </StackPanel>
-
-            </Grid>
-
-            <!-- ================= второй ряд ================= -->
-            <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,10,0,0">
-
-                <!-- Чёрный список -->
-                <Border Grid.Column="0"
-                        BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
-                        Padding="12">
-
-                    <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10">
-
-                        <TextBlock Grid.Row="0" Text="Чёрный список" FontWeight="Bold" FontSize="14"/>
-
-                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                            <TextBox Grid.Column="0"
-                                     Text="{Binding TextBoxAddToBlackList}"/>
-                            <Button Grid.Column="1"
-                                    Content="Добавить"
-                                    Command="{Binding ButtonAddToBlackList}"/>
                         </Grid>
+                    </TabItem>
 
-                        <Border Grid.Row="2"
-                                BorderBrush="LightGray" BorderThickness="1"
-                                ClipToBounds="True">
-                            <ListBox ItemsSource="{Binding ListBoxItemSourceBlacklist}"
-                                     SelectedItem="{Binding SelectedBlacklistItem}"
-                                     Height="180"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     ScrollViewer.IsScrollInertiaEnabled="True">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Border>
+                </TabControl>
+            </Border>
 
-                        <Button Grid.Row="3"
-                                Content="Удалить"
-                                Command="{Binding ButtonRemoveFromBlackList}"
-                                HorizontalAlignment="Left"/>
-
-                    </Grid>
-                </Border>
-
-                <!-- Замена слов -->
-                <Border Grid.Column="1"
-                        BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
-                        Padding="12">
-                    <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
-
-                        <!-- Задаём фиксированную или минимальную высоту строки заголовка (например, MinHeight="26") -->
-                        <Grid Grid.Row="0"
-                              ColumnDefinitions="Auto,Auto"
-                              ColumnSpacing="8"
-                              MinHeight="26">
-                            <TextBlock Grid.Column="0"
-                                       Text="Замена слов"
-                                       FontWeight="Bold"
-                                       FontSize="14"
-                                       VerticalAlignment="Center"/>
-                            <Border Grid.Column="1"
-                                    Background="#E3F2FD"
-                                    BorderBrush="#2196F3"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
-                                    Padding="6,2"
-                                    VerticalAlignment="Center"
-                                    IsVisible="{Binding IsExactMatchFound}">
-                                <TextBlock Text="Уже есть"
-                                           Foreground="#1976D2"
-                                           FontWeight="Bold"
-                                           FontSize="12"/>
-                            </Border>
-                        </Grid>
-
-                        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8">
-                            <TextBox Grid.Column="0"
-                                     PlaceholderText="Слово"
-                                     Text="{Binding TextBoxWordToReplace}"/>
-                            <TextBox Grid.Column="1"
-                                     PlaceholderText="Замена"
-                                     Text="{Binding TextBoxReplacementWord}"/>
-                            <Button Grid.Column="2"
-                                    Content="Добавить"
-                                    Command="{Binding ButtonAddWordReplacement}"/>
-                            <Button Grid.Column="3"
-                                    Content="Удалить"
-                                    Command="{Binding ButtonRemoveWordReplacement}"/>
-                        </Grid>
-
-                        <!-- Заголовки колонок -->
-                        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto" ColumnSpacing="4">
-                            <TextBlock Grid.Column="0" Text="Слово" FontWeight="SemiBold" Opacity="0.7" Margin="4,0"/>
-                            <TextBlock Grid.Column="1" Text="Замена" FontWeight="SemiBold" Opacity="0.7" Margin="4,0"/>
-                        </Grid>
-
-                        <Border Grid.Row="3"
-                                BorderBrush="LightGray" BorderThickness="1"
-                                ClipToBounds="True">
-                            <ListBox ItemsSource="{Binding FilteredWordReplacements}"
-                                     SelectedItem="{Binding SelectedWordReplacementItem}"
-                                     Height="180"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     ScrollViewer.IsScrollInertiaEnabled="True">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:WordReplacementItemViewModel">
-                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
-                                            <!-- Колонка Слово -->
-                                            <Border Grid.Column="0"
-                                                    Background="{Binding WordBackground}"
-                                                    BorderBrush="{Binding WordBorderBrush}"
-                                                    BorderThickness="{Binding WordBorderThickness}"
-                                                    CornerRadius="4"
-                                                    Padding="6,4">
-                                                <Grid ColumnDefinitions="*,Auto">
-                                                    <TextBlock Grid.Column="0"
-                                                               Text="{Binding Word}"
-                                                               FontWeight="{Binding WordFontWeight}"
-                                                               Foreground="{Binding WordForeground}"
-                                                               VerticalAlignment="Center"
-                                                               TextWrapping="Wrap"/>
-                                                    <Border Grid.Column="1"
-                                                            IsVisible="{Binding IsWordExactMatch}"
-                                                            Background="#1976D2"
-                                                            CornerRadius="3"
-                                                            Margin="4,0,0,0"
-                                                            Padding="4,1">
-                                                        <TextBlock Text="Уже есть"
-                                                                   FontSize="10"
-                                                                   FontWeight="Bold"
-                                                                   Foreground="White"/>
-                                                    </Border>
-                                                </Grid>
-                                            </Border>
-
-                                            <!-- Колонка Замена -->
-                                            <Border Grid.Column="1"
-                                                    Background="{Binding ReplacementBackground}"
-                                                    BorderBrush="{Binding ReplacementBorderBrush}"
-                                                    BorderThickness="{Binding ReplacementBorderThickness}"
-                                                    CornerRadius="4"
-                                                    Padding="6,4">
-                                                <Grid ColumnDefinitions="*,Auto">
-                                                    <TextBlock Grid.Column="0"
-                                                               Text="{Binding Replacement}"
-                                                               FontWeight="{Binding ReplacementFontWeight}"
-                                                               Foreground="{Binding ReplacementForeground}"
-                                                               VerticalAlignment="Center"
-                                                               TextWrapping="Wrap"/>
-                                                    <Border Grid.Column="1"
-                                                            IsVisible="{Binding IsReplacementExactMatch}"
-                                                            Background="#1976D2"
-                                                            CornerRadius="3"
-                                                            Margin="4,0,0,0"
-                                                            Padding="4,1">
-                                                        <TextBlock Text="Уже есть"
-                                                                   FontSize="10"
-                                                                   FontWeight="Bold"
-                                                                   Foreground="White"/>
-                                                    </Border>
-                                                </Grid>
-                                            </Border>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Border>
-
-                    </Grid>
-                </Border>
-            </Grid>
-
-            <!-- ================= третий ряд ================= -->
-            <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,10,0,0">
-                <!-- Замена слов при наличии одного символа -->
-                <Border Grid.Column="1"
-                        BorderBrush="Gray" BorderThickness="1" CornerRadius="6"
-                        Padding="12">
-                    <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
-
-                        <!-- Задаём фиксированную или минимальную высоту строки заголовка (например, MinHeight="26") -->
-                        <Grid Grid.Row="0"
-                              ColumnDefinitions="Auto,Auto"
-                              ColumnSpacing="8"
-                              MinHeight="26">
-                            <TextBlock Grid.Column="0"
-                                       Text="Замена слов при совпадении одного символа"
-                                       FontWeight="Bold"
-                                       FontSize="14"
-                                       VerticalAlignment="Center"/>
-                            <Border Grid.Column="1"
-                                    Background="#E3F2FD"
-                                    BorderBrush="#2196F3"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
-                                    Padding="6,2"
-                                    VerticalAlignment="Center"
-                                    IsVisible="{Binding IsCharExactMatchFound}">
-                                <TextBlock Text="Уже есть"
-                                           Foreground="#1976D2"
-                                           FontWeight="Bold"
-                                           FontSize="12"/>
-                            </Border>
-                        </Grid>
-
-                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
-                            <TextBox Grid.Column="0"
-                                     PlaceholderText="Символ"
-                                     Text="{Binding TextBoxCharToFind}"/>
-                            <TextBox Grid.Column="1"
-                                     PlaceholderText="Замена"
-                                     Text="{Binding TextBoxCharReplacementWord}"/>
-                            <Button Grid.Column="2"
-                                    Content="Добавить"
-                                    Command="{Binding ButtonAddCharReplacement}"/>
-                            <Button Grid.Column="3"
-                                    Content="Удалить"
-                                    Command="{Binding ButtonRemoveCharReplacement}"/>
-                        </Grid>
-
-                        <!-- Заголовки колонок -->
-                        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="4">
-                            <TextBlock Grid.Column="0" Text="Символ" FontWeight="SemiBold" Opacity="0.7" Margin="4,0"/>
-                            <TextBlock Grid.Column="1" Text="Замена всего слова на" FontWeight="SemiBold" Opacity="0.7" Margin="4,0"/>
-                        </Grid>
-
-                        <Border Grid.Row="3"
-                                BorderBrush="LightGray" BorderThickness="1"
-                                ClipToBounds="True">
-                            <ListBox ItemsSource="{Binding FilteredCharWordReplacements}"
-                                     SelectedItem="{Binding SelectedCharReplacementItem}"
-                                     Height="180"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     ScrollViewer.IsScrollInertiaEnabled="True">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:WordReplacementItemViewModel">
-                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
-                                            <!-- Колонка Символ -->
-                                            <Border Grid.Column="0"
-                                                    Background="{Binding WordBackground}"
-                                                    BorderBrush="{Binding WordBorderBrush}"
-                                                    BorderThickness="{Binding WordBorderThickness}"
-                                                    CornerRadius="4"
-                                                    Padding="6,4">
-                                                <Grid ColumnDefinitions="*,Auto">
-                                                    <TextBlock Grid.Column="0"
-                                                               Text="{Binding Word}"
-                                                               FontWeight="{Binding WordFontWeight}"
-                                                               Foreground="{Binding WordForeground}"
-                                                               VerticalAlignment="Center"
-                                                               TextWrapping="Wrap"/>
-                                                    <Border Grid.Column="1"
-                                                            IsVisible="{Binding IsWordExactMatch}"
-                                                            Background="#1976D2"
-                                                            CornerRadius="3"
-                                                            Margin="4,0,0,0"
-                                                            Padding="4,1">
-                                                        <TextBlock Text="Уже есть"
-                                                                   FontSize="10"
-                                                                   FontWeight="Bold"
-                                                                   Foreground="White"/>
-                                                    </Border>
-                                                </Grid>
-                                            </Border>
-
-                                            <!-- Колонка Замена -->
-                                            <Border Grid.Column="1"
-                                                    Background="{Binding ReplacementBackground}"
-                                                    BorderBrush="{Binding ReplacementBorderBrush}"
-                                                    BorderThickness="{Binding ReplacementBorderThickness}"
-                                                    CornerRadius="4"
-                                                    Padding="6,4">
-                                                <Grid ColumnDefinitions="*,Auto">
-                                                    <TextBlock Grid.Column="0"
-                                                               Text="{Binding Replacement}"
-                                                               FontWeight="{Binding ReplacementFontWeight}"
-                                                               Foreground="{Binding ReplacementForeground}"
-                                                               VerticalAlignment="Center"
-                                                               TextWrapping="Wrap"/>
-                                                    <Border Grid.Column="1"
-                                                            IsVisible="{Binding IsReplacementExactMatch}"
-                                                            Background="#1976D2"
-                                                            CornerRadius="3"
-                                                            Margin="4,0,0,0"
-                                                            Padding="4,1">
-                                                        <TextBlock Text="Уже есть"
-                                                                   FontSize="10"
-                                                                   FontWeight="Bold"
-                                                                   Foreground="White"/>
-                                                    </Border>
-                                                </Grid>
-                                            </Border>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Border>
-
-                    </Grid>
-                </Border>
-            </Grid>
         </Grid>
     </ScrollViewer>
 </UserControl>

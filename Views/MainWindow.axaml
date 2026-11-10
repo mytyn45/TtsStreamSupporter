@@ -25,19 +25,22 @@
                     VerticalAlignment="Stretch">
             <TabControl.Styles>
                 <Style Selector="TabItem">
-                    <Setter Property="Foreground" Value="Black"/>
-                    <Setter Property="FontSize" Value="25"/>
+                    <Setter Property="Foreground" Value="#222222"/>
+                    <Setter Property="FontSize" Value="15"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
                     <Setter Property="VerticalAlignment" Value="Center"/>
-                    <Setter Property="Margin" Value="0"/>
-                    <Setter Property="Padding" Value="10,10"/>
-                    <Setter Property="BorderThickness" Value="1"/>
+                    <Setter Property="Margin" Value="0,0,4,0"/>
+                    <Setter Property="Padding" Value="14,7"/>
+                    <Setter Property="CornerRadius" Value="6,6,0,0"/>
+                    <Setter Property="BorderThickness" Value="1,1,1,0"/>
                     <Setter Property="BorderBrush" Value="Transparent"/>
                     <Setter Property="VerticalContentAlignment" Value="Center"/>
                     <Setter Property="HorizontalContentAlignment" Value="Center"/>
                 </Style>
                 <Style Selector="TabItem:selected">
                     <Setter Property="Background" Value="#FFEFF5DC"/>
-                    <Setter Property="Padding" Value="10,5"/>
+                    <Setter Property="BorderBrush" Value="#D4E4B8"/>
+                    <Setter Property="Foreground" Value="#1A3300"/>
                 </Style>
             </TabControl.Styles>
             <TabItem Header="Connection">
