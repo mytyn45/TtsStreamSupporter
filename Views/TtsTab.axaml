@@ -215,9 +215,23 @@
 
                     <!-- Вкладка 1: Замена слов -->
                     <TabItem Header="Замена слов">
-                        <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="6" Margin="0,6,0,0">
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="6" Margin="0,6,0,0">
+                            <!-- Ползунок мягкого сравнения -->
+                            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                <Label Grid.Column="0" Content="Мягкое сравнение (ошибок):" VerticalAlignment="Center" Padding="0"/>
+                                <Slider Grid.Column="1"
+                                        ToolTip.Tip="Допустимое количество опечаток/ошибок для замены (0 = только точное)"
+                                        Minimum="0" Maximum="3"
+                                        Value="{Binding SliderWordFuzzyThreshold}"
+                                        TickFrequency="1" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding WordFuzzyThresholdText}"
+                                           VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"
+                                           Width="85" TextAlignment="Right"/>
+                            </Grid>
+
                             <!-- Форма ввода -->
-                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,*,Auto,Auto" ColumnSpacing="6">
+                            <Grid Grid.Row="1" ColumnDefinitions="*,Auto,*,Auto,Auto" ColumnSpacing="6">
                                 <TextBox Grid.Column="0"
                                          PlaceholderText="Слово"
                                          Text="{Binding TextBoxWordToReplace}"/>
@@ -238,28 +252,98 @@
                                         Command="{Binding ButtonRemoveWordReplacement}"/>
                             </Grid>
 
-                            <!-- Оповещение о совпадении -->
-                            <Border Grid.Row="1"
-                                    Background="#E3F2FD"
-                                    BorderBrush="#2196F3"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
-                                    Padding="6,3"
-                                    IsVisible="{Binding IsExactMatchFound}">
-                                <TextBlock Text="Такое слово уже есть в правилах"
-                                           Foreground="#1976D2"
-                                           FontWeight="Bold"
-                                           FontSize="12"/>
-                            </Border>
+                            <!-- Оповещения о совпадении и конфликтах -->
+                            <StackPanel Grid.Row="2" Spacing="4">
+                                <Border Background="#E3F2FD"
+                                        BorderBrush="#2196F3"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="6,3"
+                                        IsVisible="{Binding IsExactMatchFound}">
+                                    <TextBlock Text="Такое слово уже есть в правилах"
+                                               Foreground="#1976D2"
+                                               FontWeight="Bold"
+                                               FontSize="12"/>
+                                </Border>
 
-                            <!-- Заголовки колонок -->
-                            <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="4">
-                                <TextBlock Grid.Column="0" Text="Слово" FontWeight="SemiBold" Opacity="0.7" Margin="6,0"/>
-                                <TextBlock Grid.Column="1" Text="Замена" FontWeight="SemiBold" Opacity="0.7" Margin="6,0"/>
+                                <Border Background="#FFF3E0"
+                                        BorderBrush="#FF9800"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="6,3"
+                                        IsVisible="{Binding IsConflictFound}">
+                                    <TextBlock Text="{Binding ConflictWarningText}"
+                                               Foreground="#E65100"
+                                               FontWeight="SemiBold"
+                                               FontSize="12"/>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Заголовки колонок с сортировкой -->
+                            <Grid Grid.Row="3" ColumnDefinitions="*,*,120" ColumnSpacing="4">
+                                <!-- Кнопка 1: Что заменять -->
+                                <Button Grid.Column="0"
+                                        Command="{Binding ButtonToggleWordSort}"
+                                        CommandParameter="Word"
+                                        Background="{Binding WordHeaderBackground}"
+                                        BorderBrush="{Binding WordHeaderBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="6,3"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Cursor="Hand">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="Что заменять" FontWeight="SemiBold"
+                                                   Foreground="{Binding WordHeaderForeground}" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding WordSortIndicator}" FontWeight="Bold"
+                                                   Foreground="{Binding WordHeaderForeground}"/>
+                                    </Grid>
+                                </Button>
+
+                                <!-- Кнопка 2: На что заменять -->
+                                <Button Grid.Column="1"
+                                        Command="{Binding ButtonToggleWordSort}"
+                                        CommandParameter="Replacement"
+                                        Background="{Binding ReplacementHeaderBackground}"
+                                        BorderBrush="{Binding ReplacementHeaderBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="6,3"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Cursor="Hand">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="На что заменять" FontWeight="SemiBold"
+                                                   Foreground="{Binding ReplacementHeaderForeground}" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding ReplacementSortIndicator}" FontWeight="Bold"
+                                                   Foreground="{Binding ReplacementHeaderForeground}"/>
+                                    </Grid>
+                                </Button>
+
+                                <!-- Кнопка 3: Дата добавления -->
+                                <Button Grid.Column="2"
+                                        Command="{Binding ButtonToggleWordSort}"
+                                        CommandParameter="Date"
+                                        Background="{Binding DateHeaderBackground}"
+                                        BorderBrush="{Binding DateHeaderBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="6,3"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Cursor="Hand">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="Дата" FontWeight="SemiBold"
+                                                   Foreground="{Binding DateHeaderForeground}" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding DateSortIndicator}" FontWeight="Bold"
+                                                   Foreground="{Binding DateHeaderForeground}"/>
+                                    </Grid>
+                                </Button>
                             </Grid>
 
                             <!-- Список -->
-                            <Border Grid.Row="3"
+                            <Border Grid.Row="4"
                                     BorderBrush="#E0E0E0" BorderThickness="1"
                                     CornerRadius="4"
                                     ClipToBounds="True">
@@ -272,7 +356,7 @@
                                          ScrollViewer.IsScrollInertiaEnabled="True">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate x:DataType="vm:WordReplacementItemViewModel">
-                                            <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                                            <Grid ColumnDefinitions="*,*,120" ColumnSpacing="4">
                                                 <!-- Слово -->
                                                 <Border Grid.Column="0"
                                                         Background="{Binding WordBackground}"
@@ -287,17 +371,29 @@
                                                                    Foreground="{Binding WordForeground}"
                                                                    VerticalAlignment="Center"
                                                                    TextWrapping="Wrap"/>
-                                                        <Border Grid.Column="1"
-                                                                IsVisible="{Binding IsWordExactMatch}"
-                                                                Background="#1976D2"
-                                                                CornerRadius="3"
-                                                                Margin="4,0,0,0"
-                                                                Padding="4,1">
-                                                            <TextBlock Text="Уже есть"
-                                                                       FontSize="10"
-                                                                       FontWeight="Bold"
-                                                                       Foreground="White"/>
-                                                        </Border>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                            <Border IsVisible="{Binding IsWordExactMatch}"
+                                                                    Background="#1976D2"
+                                                                    CornerRadius="3"
+                                                                    Margin="4,0,0,0"
+                                                                    Padding="4,1">
+                                                                <TextBlock Text="Уже есть"
+                                                                           FontSize="10"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="White"/>
+                                                            </Border>
+                                                            <Border IsVisible="{Binding IsConflict}"
+                                                                    Background="#E65100"
+                                                                    CornerRadius="3"
+                                                                    Margin="4,0,0,0"
+                                                                    Padding="4,1"
+                                                                    ToolTip.Tip="{Binding ConflictBadgeText}">
+                                                                <TextBlock Text="{Binding ConflictBadgeText}"
+                                                                           FontSize="10"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="White"/>
+                                                            </Border>
+                                                        </StackPanel>
                                                     </Grid>
                                                 </Border>
 
@@ -327,6 +423,17 @@
                                                                        Foreground="White"/>
                                                         </Border>
                                                     </Grid>
+                                                </Border>
+
+                                                <!-- Дата добавления -->
+                                                <Border Grid.Column="2"
+                                                        Padding="6,3"
+                                                        VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding CreatedAtText}"
+                                                               FontSize="11"
+                                                               Foreground="#757575"
+                                                               VerticalAlignment="Center"
+                                                               TextAlignment="Center"/>
                                                 </Border>
                                             </Grid>
                                         </DataTemplate>

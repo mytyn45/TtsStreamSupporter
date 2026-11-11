@@ -15,6 +15,14 @@ using TtsStreamSupporter.Settings;
 
 namespace TtsStreamSupporter.ViewModels;
 
+public enum WordSortColumn
+{
+    None,
+    Word,
+    Replacement,
+    Date
+}
+
 public partial class TtsTabViewModel : ViewModelBase
 {
     private readonly SettingsService _settings;
@@ -131,6 +139,77 @@ public partial class TtsTabViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isExactMatchFound;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WordFuzzyThresholdText))]
+    private int _sliderWordFuzzyThreshold;
+
+    public string WordFuzzyThresholdText => SliderWordFuzzyThreshold switch
+    {
+        0 => "0 (выкл)",
+        1 => "1 ошибка",
+        2 => "2 ошибки",
+        _ => $"{SliderWordFuzzyThreshold} ошибки"
+    };
+
+    [ObservableProperty]
+    private bool _isConflictFound;
+
+    [ObservableProperty]
+    private string? _conflictWarningText;
+
+    private static readonly IBrush SortActiveBackground = Brush.Parse("#E3F2FD");
+    private static readonly IBrush SortActiveBorderBrush = Brush.Parse("#1976D2");
+    private static readonly IBrush SortActiveForeground = Brush.Parse("#1565C0");
+
+    private static readonly IBrush SortInactiveBackground = Brushes.Transparent;
+    private static readonly IBrush SortInactiveBorderBrush = Brush.Parse("#E0E0E0");
+    private static readonly IBrush SortInactiveForeground = Brush.Parse("#555555");
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WordSortIndicator))]
+    [NotifyPropertyChangedFor(nameof(ReplacementSortIndicator))]
+    [NotifyPropertyChangedFor(nameof(DateSortIndicator))]
+    [NotifyPropertyChangedFor(nameof(WordHeaderBackground))]
+    [NotifyPropertyChangedFor(nameof(ReplacementHeaderBackground))]
+    [NotifyPropertyChangedFor(nameof(DateHeaderBackground))]
+    [NotifyPropertyChangedFor(nameof(WordHeaderBorderBrush))]
+    [NotifyPropertyChangedFor(nameof(ReplacementHeaderBorderBrush))]
+    [NotifyPropertyChangedFor(nameof(DateHeaderBorderBrush))]
+    [NotifyPropertyChangedFor(nameof(WordHeaderForeground))]
+    [NotifyPropertyChangedFor(nameof(ReplacementHeaderForeground))]
+    [NotifyPropertyChangedFor(nameof(DateHeaderForeground))]
+    private WordSortColumn _currentSortColumn = WordSortColumn.None;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WordSortIndicator))]
+    [NotifyPropertyChangedFor(nameof(ReplacementSortIndicator))]
+    [NotifyPropertyChangedFor(nameof(DateSortIndicator))]
+    private bool _isSortAscending = true;
+
+    public string WordSortIndicator => CurrentSortColumn == WordSortColumn.Word
+        ? (IsSortAscending ? " ▲" : " ▼")
+        : string.Empty;
+
+    public string ReplacementSortIndicator => CurrentSortColumn == WordSortColumn.Replacement
+        ? (IsSortAscending ? " ▲" : " ▼")
+        : string.Empty;
+
+    public string DateSortIndicator => CurrentSortColumn == WordSortColumn.Date
+        ? (IsSortAscending ? " ▲" : " ▼")
+        : string.Empty;
+
+    public IBrush WordHeaderBackground => CurrentSortColumn == WordSortColumn.Word ? SortActiveBackground : SortInactiveBackground;
+    public IBrush WordHeaderBorderBrush => CurrentSortColumn == WordSortColumn.Word ? SortActiveBorderBrush : SortInactiveBorderBrush;
+    public IBrush WordHeaderForeground => CurrentSortColumn == WordSortColumn.Word ? SortActiveForeground : SortInactiveForeground;
+
+    public IBrush ReplacementHeaderBackground => CurrentSortColumn == WordSortColumn.Replacement ? SortActiveBackground : SortInactiveBackground;
+    public IBrush ReplacementHeaderBorderBrush => CurrentSortColumn == WordSortColumn.Replacement ? SortActiveBorderBrush : SortInactiveBorderBrush;
+    public IBrush ReplacementHeaderForeground => CurrentSortColumn == WordSortColumn.Replacement ? SortActiveForeground : SortInactiveForeground;
+
+    public IBrush DateHeaderBackground => CurrentSortColumn == WordSortColumn.Date ? SortActiveBackground : SortInactiveBackground;
+    public IBrush DateHeaderBorderBrush => CurrentSortColumn == WordSortColumn.Date ? SortActiveBorderBrush : SortInactiveBorderBrush;
+    public IBrush DateHeaderForeground => CurrentSortColumn == WordSortColumn.Date ? SortActiveForeground : SortInactiveForeground;
+
     public ObservableCollection<WordReplacementItemViewModel> FilteredWordReplacements { get; } = new();
 
     // =========================================================
@@ -195,8 +274,12 @@ public partial class TtsTabViewModel : ViewModelBase
             ListBoxItemSourceBlacklist.Add(user);
 
         // Замена слов
+        SliderWordFuzzyThreshold = _settings.Settings.WordReplacementMaxErrors;
         foreach (var kvp in _settings.Settings.WordReplacements)
-            _allWordReplacements.Add(new WordReplacementItemViewModel(kvp.Key, kvp.Value));
+        {
+            _settings.Settings.WordReplacementDates.TryGetValue(kvp.Key, out var createdAt);
+            _allWordReplacements.Add(new WordReplacementItemViewModel(kvp.Key, kvp.Value, createdAt));
+        }
         ApplyFilter();
 
         // Замена символов
@@ -324,6 +407,13 @@ public partial class TtsTabViewModel : ViewModelBase
         ApplyFilter();
     }
 
+    partial void OnSliderWordFuzzyThresholdChanged(int value)
+    {
+        _settings.Settings.WordReplacementMaxErrors = value;
+        _ = _settings.DelayedSave();
+        ApplyFilter();
+    }
+
     partial void OnTextBoxCharToFindChanged(string? value)
     {
         ApplyCharFilter();
@@ -362,6 +452,9 @@ public partial class TtsTabViewModel : ViewModelBase
         TextBoxWordToReplace = string.Empty;
         TextBoxReplacementWord = string.Empty;
         SelectedWordReplacementItem = null;
+        IsConflictFound = false;
+        ConflictWarningText = null;
+        ApplyFilter();
     }
 
     [RelayCommand]
@@ -370,6 +463,7 @@ public partial class TtsTabViewModel : ViewModelBase
         TextBoxCharToFind = string.Empty;
         TextBoxCharReplacementWord = string.Empty;
         SelectedCharReplacementItem = null;
+        ApplyCharFilter();
     }
 
     // =========================================================
@@ -507,6 +601,26 @@ public partial class TtsTabViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(word) || string.IsNullOrWhiteSpace(replacement))
             return;
 
+        // Проверка конфликтов перед добавлением нового правила
+        if (SliderWordFuzzyThreshold > 0)
+        {
+            foreach (var item in _allWordReplacements)
+            {
+                if (string.Equals(item.Word, word, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (string.Equals(item.Replacement, replacement, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (FuzzyMatcher.AreInConflict(word, item.Word, SliderWordFuzzyThreshold, out int dist))
+                {
+                    IsConflictFound = true;
+                    ConflictWarningText = $"Конфликт: '{word}' слишком похоже на '{item.Word}' (разница: {dist} симв.)";
+                    return;
+                }
+            }
+        }
+
         var existingKey = _settings.Settings.WordReplacements.Keys
             .FirstOrDefault(k => string.Equals(k, word, StringComparison.OrdinalIgnoreCase));
 
@@ -515,7 +629,9 @@ public partial class TtsTabViewModel : ViewModelBase
             _settings.Settings.WordReplacements.Remove(existingKey);
         }
 
+        var now = DateTime.Now;
         _settings.Settings.WordReplacements[word] = replacement;
+        _settings.Settings.WordReplacementDates[word] = now;
         _ = _settings.DelayedSave();
 
         var existingItem = _allWordReplacements
@@ -525,14 +641,17 @@ public partial class TtsTabViewModel : ViewModelBase
         {
             existingItem.Word = word;
             existingItem.Replacement = replacement;
+            existingItem.CreatedAt = now;
         }
         else
         {
-            _allWordReplacements.Insert(0, new WordReplacementItemViewModel(word, replacement));
+            _allWordReplacements.Insert(0, new WordReplacementItemViewModel(word, replacement, now));
         }
 
         TextBoxWordToReplace = string.Empty;
         TextBoxReplacementWord = string.Empty;
+        IsConflictFound = false;
+        ConflictWarningText = null;
         ApplyFilter();
     }
 
@@ -557,6 +676,7 @@ public partial class TtsTabViewModel : ViewModelBase
         if (existingKey != null)
         {
             _settings.Settings.WordReplacements.Remove(existingKey);
+            _settings.Settings.WordReplacementDates.Remove(existingKey);
             _ = _settings.DelayedSave();
         }
 
@@ -565,6 +685,37 @@ public partial class TtsTabViewModel : ViewModelBase
 
         TextBoxWordToReplace = string.Empty;
         TextBoxReplacementWord = string.Empty;
+        IsConflictFound = false;
+        ConflictWarningText = null;
+        ApplyFilter();
+    }
+
+    [RelayCommand]
+    private void ToggleWordSort(string? column)
+    {
+        var target = column?.ToLowerInvariant() switch
+        {
+            "word" => WordSortColumn.Word,
+            "replacement" => WordSortColumn.Replacement,
+            "date" => WordSortColumn.Date,
+            _ => WordSortColumn.None
+        };
+
+        if (target == WordSortColumn.None)
+            return;
+
+        if (CurrentSortColumn == target)
+        {
+            // Повторный клик: переключаем направление
+            IsSortAscending = !IsSortAscending;
+        }
+        else
+        {
+            // Первый клик по столбцу: делаем его активным
+            CurrentSortColumn = target;
+            IsSortAscending = true;
+        }
+
         ApplyFilter();
     }
 
@@ -576,7 +727,38 @@ public partial class TtsTabViewModel : ViewModelBase
         bool hasWordQuery = !string.IsNullOrEmpty(queryWord);
         bool hasRepQuery = !string.IsNullOrEmpty(queryRep);
 
-        FilteredWordReplacements.Clear();
+        // 1. Сброс конфликтов у всех правил
+        foreach (var item in _allWordReplacements)
+        {
+            item.IsConflict = false;
+            item.ConflictWith = null;
+        }
+
+        // 2. Попарный поиск конфликтов между существующими правилами
+        if (SliderWordFuzzyThreshold > 0)
+        {
+            for (int i = 0; i < _allWordReplacements.Count; i++)
+            {
+                var a = _allWordReplacements[i];
+                for (int j = i + 1; j < _allWordReplacements.Count; j++)
+                {
+                    var b = _allWordReplacements[j];
+                    if (string.Equals(a.Replacement, b.Replacement, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (FuzzyMatcher.AreInConflict(a.Word, b.Word, SliderWordFuzzyThreshold))
+                    {
+                        a.IsConflict = true;
+                        a.ConflictWith = b.Word;
+                        b.IsConflict = true;
+                        b.ConflictWith = a.Word;
+                    }
+                }
+            }
+        }
+
+        // 3. Фильтрация и точное совпадение
+        var matchedItems = new List<WordReplacementItemViewModel>();
         bool anyExact = false;
 
         foreach (var item in _allWordReplacements)
@@ -600,7 +782,7 @@ public partial class TtsTabViewModel : ViewModelBase
                 if (isWordExact || isRepExact)
                     anyExact = true;
 
-                FilteredWordReplacements.Add(item);
+                matchedItems.Add(item);
             }
             else
             {
@@ -609,7 +791,69 @@ public partial class TtsTabViewModel : ViewModelBase
             }
         }
 
+        // Сортировка элементов
+        IEnumerable<WordReplacementItemViewModel> sortedItems = CurrentSortColumn switch
+        {
+            WordSortColumn.Word => IsSortAscending
+                ? matchedItems.OrderBy(x => x.Word, StringComparer.CurrentCultureIgnoreCase)
+                : matchedItems.OrderByDescending(x => x.Word, StringComparer.CurrentCultureIgnoreCase),
+
+            WordSortColumn.Replacement => IsSortAscending
+                ? matchedItems.OrderBy(x => x.Replacement, StringComparer.CurrentCultureIgnoreCase)
+                : matchedItems.OrderByDescending(x => x.Replacement, StringComparer.CurrentCultureIgnoreCase),
+
+            WordSortColumn.Date => IsSortAscending
+                ? matchedItems.OrderBy(x => x.CreatedAt)
+                : matchedItems.OrderByDescending(x => x.CreatedAt),
+
+            _ => matchedItems
+        };
+
+        FilteredWordReplacements.Clear();
+        foreach (var item in sortedItems)
+        {
+            FilteredWordReplacements.Add(item);
+        }
+
         IsExactMatchFound = anyExact;
+
+        // 4. Проверка конфликта текущего ввода с существующими правилами
+        if (hasWordQuery && SliderWordFuzzyThreshold > 0 && !anyExact)
+        {
+            string? conflictingWord = null;
+            int conflictDistance = 0;
+
+            foreach (var item in _allWordReplacements)
+            {
+                if (string.Equals(item.Word, queryWord, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (string.Equals(item.Replacement, queryRep, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (FuzzyMatcher.AreInConflict(queryWord, item.Word, SliderWordFuzzyThreshold, out conflictDistance))
+                {
+                    conflictingWord = item.Word;
+                    break;
+                }
+            }
+
+            if (conflictingWord != null)
+            {
+                IsConflictFound = true;
+                ConflictWarningText = $"Конфликт: '{queryWord}' слишком похоже на '{conflictingWord}' (разница: {conflictDistance} симв.)";
+            }
+            else
+            {
+                IsConflictFound = false;
+                ConflictWarningText = null;
+            }
+        }
+        else
+        {
+            IsConflictFound = false;
+            ConflictWarningText = null;
+        }
     }
 
     // =========================================================
@@ -687,6 +931,7 @@ public partial class TtsTabViewModel : ViewModelBase
         ApplyCharFilter();
     }
 
+
     private void ApplyCharFilter()
     {
         string querySymbol = TextBoxCharToFind?.Trim() ?? string.Empty;
@@ -744,4 +989,5 @@ public partial class TtsTabViewModel : ViewModelBase
     public IRelayCommand ButtonAddCharReplacement => AddCharReplacementCommand;
     public IRelayCommand ButtonRemoveCharReplacement => RemoveCharReplacementCommand;
     public IRelayCommand ButtonClearCharReplacementInputs => ClearCharReplacementInputsCommand;
+    public IRelayCommand<string?> ButtonToggleWordSort => ToggleWordSortCommand;
 }

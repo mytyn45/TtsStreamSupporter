@@ -36,6 +36,8 @@ public class AppSettings
     public HashSet<string> ListBoxItemSourceBlackList { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public Dictionary<string, string> WordReplacements { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, DateTime> WordReplacementDates { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public int WordReplacementMaxErrors { get; set; } = 0;
     public Dictionary<string, string> CharWordReplacements { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public bool CheckBoxNttsVoicesIsEnabled { get; set; }

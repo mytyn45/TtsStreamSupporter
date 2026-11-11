@@ -126,6 +126,9 @@ public class SettingsService
                 if (Settings.WordReplacements == null)
                     Settings.WordReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+                if (Settings.WordReplacementDates == null)
+                    Settings.WordReplacementDates = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+
                 if (Settings.CharWordReplacements == null)
                     Settings.CharWordReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 

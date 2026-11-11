@@ -326,7 +326,13 @@ public class TtsMessageProcessing
             return false;
         }
 
-        return _settings.Settings.WordReplacements.TryGetValue(word, out replacement);
+        int maxErrors = _settings.Settings.WordReplacementMaxErrors;
+        if (maxErrors <= 0)
+        {
+            return _settings.Settings.WordReplacements.TryGetValue(word, out replacement);
+        }
+
+        return FuzzyMatcher.FindBestMatch(word, _settings.Settings.WordReplacements, maxErrors, out replacement);
     }
 
     private bool TryGetCharWordReplacement(string word, out string? replacement)
