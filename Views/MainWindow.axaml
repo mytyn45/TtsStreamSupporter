@@ -77,44 +77,74 @@
                 <CheckBox IsChecked="{Binding CheckBoxNttsVoicesIsEnabled}"
                           Content="Включить Ntts"/>
             </StackPanel>
-            <!-- Предупреждения в центре в самом низу -->
-            <ItemsControl Grid.Column="1"
-                          ItemsSource="{Binding ActiveWarnings}"
-                          Margin="15,0"
-                          VerticalAlignment="Center"
-                          HorizontalAlignment="Center">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="{Binding BackgroundBrush}"
-                                CornerRadius="6"
-                                Padding="10,5"
-                                Margin="4"
+            <!-- Центральная нижняя часть: статус NTTS и предупреждения об ошибках -->
+            <WrapPanel Grid.Column="1"
+                       Orientation="Horizontal"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Margin="10,0">
+
+                <!-- Статус доступности серверов NTTS -->
+                <Border Background="{Binding NttsHealthCheck.StatusBackgroundBrush}"
+                        BorderBrush="{Binding NttsHealthCheck.StatusBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="10,5"
+                        Margin="4"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding NttsHealthCheck.IsStatusVisible}">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="6"
                                 VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal"
-                                        Spacing="6"
-                                        VerticalAlignment="Center">
-                                <TextBlock Text="⚠"
-                                           FontWeight="Bold"
-                                           FontSize="13"
-                                           VerticalAlignment="Center"
-                                           Foreground="{Binding ForegroundBrush}"/>
-                                <TextBlock Text="{Binding Message}"
-                                           FontWeight="SemiBold"
-                                           FontSize="12"
-                                           VerticalAlignment="Center"
-                                           Foreground="{Binding ForegroundBrush}"/>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                        <TextBlock Text="{Binding NttsHealthCheck.StatusIcon}"
+                                   FontWeight="Bold"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding NttsHealthCheck.StatusForegroundBrush}"/>
+                        <TextBlock Text="{Binding NttsHealthCheck.StatusText}"
+                                   FontWeight="SemiBold"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding NttsHealthCheck.StatusForegroundBrush}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Предупреждения в центре в самом низу -->
+                <ItemsControl ItemsSource="{Binding ActiveWarnings}"
+                              VerticalAlignment="Center">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"
+                                       VerticalAlignment="Center"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{Binding BackgroundBrush}"
+                                    CornerRadius="6"
+                                    Padding="10,5"
+                                    Margin="4"
+                                    VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="6"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="⚠"
+                                               FontWeight="Bold"
+                                               FontSize="13"
+                                               VerticalAlignment="Center"
+                                               Foreground="{Binding ForegroundBrush}"/>
+                                    <TextBlock Text="{Binding Message}"
+                                               FontWeight="SemiBold"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               Foreground="{Binding ForegroundBrush}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </WrapPanel>
+
             <!-- Статусы подключений справа с цветным фоном -->
             <ItemsControl Grid.Column="2"
                           ItemsSource="{Binding Connections}"

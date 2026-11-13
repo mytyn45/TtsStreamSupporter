@@ -19,6 +19,7 @@ public class SpeechPlayerService : IDisposable
     // Ленивая инициализация: на Linux/macOS не будет падать при старте приложения
     private SpeechSynthesizer? _speech;
     private readonly SettingsService _settings;
+    private readonly NttsHealthCheckService? _nttsHealthCheckService;
 
     private readonly object _speechLock = new();
     private readonly object _playbackLock = new();
@@ -87,9 +88,10 @@ public class SpeechPlayerService : IDisposable
         }
     ];
 
-    public SpeechPlayerService(SettingsService settings)
+    public SpeechPlayerService(SettingsService settings, NttsHealthCheckService? nttsHealthCheckService = null)
     {
         _settings = settings;
+        _nttsHealthCheckService = nttsHealthCheckService;
         _activeServerIndex = _settings.Settings.NttsUseFallbackServer ? 1 : 0;
     }
 
@@ -298,6 +300,15 @@ public class SpeechPlayerService : IDisposable
             catch (Exception backupEx)
             {
                 Log.Error(backupEx, "Не удалось получить аудио ни с одного NTTS-сервера ({PrimaryHost}, {BackupHost}).", primaryHost, backupHost);
+
+                if (_settings.Settings.NttsAutoDisableOnFailure && _nttsHealthCheckService != null)
+                {
+                    _nttsHealthCheckService.NotifyBothServersFailed();
+
+                    Log.Information("NTTS: аварийный фоллбэк сообщения на локальный голос...");
+                    return await FallbackGenerateWavAsync(message);
+                }
+
                 throw;
             }
         }
@@ -305,6 +316,27 @@ public class SpeechPlayerService : IDisposable
         {
             _nttsRequestLock.Release();
         }
+    }
+
+    private async Task<MemoryStream> FallbackGenerateWavAsync(ProcessedTtsMessage message)
+    {
+        string voice = _settings.Settings.SelectedSingleVoice ?? "";
+        var fallbackMsg = new ProcessedTtsMessage
+        {
+            Text = message.Text,
+            VoiceName = voice,
+            VoiceVolume = _settings.Settings.StandardVoiceVolume,
+            VoiceSpeed = _settings.Settings.StandardVoiceSpeed,
+            Engine = TtsEngine.Auto,
+            Platform = message.Platform
+        };
+
+        if (IsPiperVoice(voice))
+        {
+            return await GenerateWavPiperEngine(fallbackMsg);
+        }
+
+        return await Task.Run(() => GenerateWavMicrosoftEngine(fallbackMsg));
     }
 
     private static bool IsClientSideError(Exception ex)

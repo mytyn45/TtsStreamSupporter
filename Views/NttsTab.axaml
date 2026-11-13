@@ -50,6 +50,14 @@
                         <CheckBox Content="Включить NTTS"
                                   IsChecked="{Binding CheckBoxNttsVoicesIsEnabled}"/>
 
+                        <CheckBox Content="Автоматически отключать при сбое серверов"
+                                  IsChecked="{Binding NttsAutoDisableOnFailure}"
+                                  ToolTip.Tip="Если оба сервера NTTS не отвечают, NTTS временно выключается, голоса переходят на обычные, и каждые 10 секунд пингуются оба сервера до восстановления связи."/>
+
+                        <CheckBox Content="Постоянная проверка серверов NTTS (раз в минуту)"
+                                  IsChecked="{Binding NttsPeriodicPingEnabled}"
+                                  ToolTip.Tip="Периодически проверяет доступность серверов NTTS и отображает их статус в нижней части окна."/>
+
                         <StackPanel Spacing="2">
                             <CheckBox Content="Использовать запасной сервер"
                                       IsChecked="{Binding NttsUseFallbackServer}"

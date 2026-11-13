@@ -44,6 +44,8 @@ public class AppSettings
     public string? NttsApi { get; set; } = "";
     public string NttsVoiceChangeCommand { get; set; } = "";
     public bool NttsUseFallbackServer { get; set; }
+    public bool NttsAutoDisableOnFailure { get; set; } = true;
+    public bool NttsPeriodicPingEnabled { get; set; } = true;
 
     public bool TtsDelayEnabled { get; set; }
     public int TtsDelayTime { get; set; } = 0;

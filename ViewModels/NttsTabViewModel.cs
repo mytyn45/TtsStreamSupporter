@@ -19,9 +19,17 @@ public partial class NttsTabViewModel : ViewModelBase
     private readonly SettingsService _settings;
     private readonly SpeechPlayerService? _speechPlayerService;
     private readonly IndividualVoiceService? _individualVoiceService;
+    private readonly NttsHealthCheckService? _nttsHealthCheckService;
+    private bool _isProgrammaticNttsChange;
 
     [ObservableProperty]
     private bool _checkBoxNttsVoicesIsEnabled;
+
+    [ObservableProperty]
+    private bool _nttsAutoDisableOnFailure = true;
+
+    [ObservableProperty]
+    private bool _nttsPeriodicPingEnabled = true;
 
     [ObservableProperty]
     private string? _nttsApi = "";
@@ -45,20 +53,45 @@ public partial class NttsTabViewModel : ViewModelBase
     public NttsTabViewModel(
         SettingsService settings,
         SpeechPlayerService? speechPlayerService = null,
-        IndividualVoiceService? individualVoiceService = null)
+        IndividualVoiceService? individualVoiceService = null,
+        NttsHealthCheckService? nttsHealthCheckService = null)
     {
         _settings = settings;
         _speechPlayerService = speechPlayerService;
         _individualVoiceService = individualVoiceService;
+        _nttsHealthCheckService = nttsHealthCheckService;
 
         _nttsApi = _settings.Settings.NttsApi;
         _nttsVoiceChangeCommand = _settings.Settings.NttsVoiceChangeCommand;
         _checkBoxNttsVoicesIsEnabled = _settings.Settings.CheckBoxNttsVoicesIsEnabled;
         _nttsUseFallbackServer = _settings.Settings.NttsUseFallbackServer;
+        _nttsAutoDisableOnFailure = _settings.Settings.NttsAutoDisableOnFailure;
+        _nttsPeriodicPingEnabled = _settings.Settings.NttsPeriodicPingEnabled;
 
         if (_speechPlayerService != null)
         {
             _speechPlayerService.ActiveServerChanged += OnActiveServerChanged;
+        }
+
+        if (_nttsHealthCheckService != null)
+        {
+            _nttsHealthCheckService.RequestSetNttsEnabled += enabled =>
+            {
+                _isProgrammaticNttsChange = true;
+                try
+                {
+                    CheckBoxNttsVoicesIsEnabled = enabled;
+                }
+                finally
+                {
+                    _isProgrammaticNttsChange = false;
+                }
+            };
+
+            _nttsHealthCheckService.RequestSetFallbackServer += isFallback =>
+            {
+                NttsUseFallbackServer = isFallback;
+            };
         }
 
         LoadLocalVoicesIfAvailable();
@@ -79,6 +112,29 @@ public partial class NttsTabViewModel : ViewModelBase
     {
         _settings.Settings.CheckBoxNttsVoicesIsEnabled = value;
         _ = _settings.DelayedSave();
+
+        if (!_isProgrammaticNttsChange)
+        {
+            _nttsHealthCheckService?.CancelTemporaryDisable();
+        }
+    }
+
+    partial void OnNttsAutoDisableOnFailureChanged(bool value)
+    {
+        _settings.Settings.NttsAutoDisableOnFailure = value;
+        _ = _settings.DelayedSave();
+
+        if (!value)
+        {
+            _nttsHealthCheckService?.CancelTemporaryDisable();
+        }
+    }
+
+    partial void OnNttsPeriodicPingEnabledChanged(bool value)
+    {
+        _settings.Settings.NttsPeriodicPingEnabled = value;
+        _ = _settings.DelayedSave();
+        _nttsHealthCheckService?.SetPeriodicPingEnabled(value);
     }
 
     partial void OnNttsApiChanged(string? value)

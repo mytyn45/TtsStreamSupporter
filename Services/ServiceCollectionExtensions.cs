@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
         // Сервисы ядра и настроек
         services.AddSingleton<SettingsService>();
         services.AddSingleton<IVoiceDiscoveryService, VoiceDiscoveryService>();
+        services.AddSingleton<NttsHealthCheckService>();
         services.AddSingleton<SpeechPlayerService>();
         services.AddSingleton<MessageQueue>();
         services.AddSingleton<NttsSpeakerLookupService>();

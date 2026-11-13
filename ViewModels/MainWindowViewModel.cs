@@ -16,6 +16,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public IndividualVoicesTabViewModel IndividualVoicesTab { get; }
     public LogsTabViewModel LogsTab { get; }
     public NttsTabViewModel NttsTab { get; }
+    public NttsHealthCheckService NttsHealthCheck { get; }
 
     // Подключения для отображения в правой нижней части MainWindow
     public ObservableCollection<ConnectionStatus> Connections => ConnectionsTab.Connections;
@@ -49,7 +50,8 @@ public partial class MainWindowViewModel : ViewModelBase
         IndividualVoicesTabViewModel individualVoicesTab,
         LogsTabViewModel logsTab,
         NttsTabViewModel nttsTab,
-        IChatRouterService chatRouterService)
+        IChatRouterService chatRouterService,
+        NttsHealthCheckService nttsHealthCheck)
     {
         _settings = settings;
 
@@ -58,6 +60,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IndividualVoicesTab = individualVoicesTab;
         LogsTab = logsTab;
         NttsTab = nttsTab;
+        NttsHealthCheck = nttsHealthCheck;
 
         // Запуск фоновой маршрутизации сообщений чата
         chatRouterService.Initialize();
