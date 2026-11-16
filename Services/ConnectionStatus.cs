@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using TtsStreamSupporter.ViewModels;
 
 namespace TtsStreamSupporter.Services;
@@ -24,6 +26,11 @@ public abstract class ConnectionBase
 
         State = state;
         StateChanged?.Invoke(state);
+    }
+
+    public virtual Task<bool> CheckHealthAsync(CancellationToken ct = default)
+    {
+        return Task.FromResult(State == ConnectionState.Connected);
     }
 }
 

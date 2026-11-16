@@ -32,6 +32,8 @@ public class KickConnection : ConnectionBase
     private Task? _heartbeatTask;
     private string? _channelName;
     private bool _manualDisconnect;
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private DateTime _lastMessageReceivedUtc = DateTime.MinValue;
 
     public KickConnection()
     {
@@ -51,6 +53,69 @@ public class KickConnection : ConnectionBase
     {
         Disconnect();
         await ConnectAsync(channelToConnect);
+    }
+
+    public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
+    {
+        var ws = _webSocket;
+        if (State != ConnectionState.Connected || ws == null || ws.State != WebSocketState.Open)
+        {
+            return false;
+        }
+
+        var elapsed = DateTime.UtcNow - _lastMessageReceivedUtc;
+        if (elapsed < TimeSpan.FromSeconds(30))
+        {
+            return true;
+        }
+
+        var lastReceivedBeforePing = _lastMessageReceivedUtc;
+        try
+        {
+            await SendWebSocketTextAsync(ws, "{\"event\":\"pusher:ping\",\"data\":{}}", ct);
+
+            var startWait = DateTime.UtcNow;
+            while (DateTime.UtcNow - startWait < TimeSpan.FromSeconds(5))
+            {
+                if (ct.IsCancellationRequested || ws.State != WebSocketState.Open)
+                    return false;
+
+                if (_lastMessageReceivedUtc > lastReceivedBeforePing)
+                {
+                    return true;
+                }
+
+                await Task.Delay(250, ct);
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Ошибка при проверке связи с Kick: {Error}", ex.Message);
+            return false;
+        }
+    }
+
+    private async Task SendWebSocketTextAsync(ClientWebSocket socket, string text, CancellationToken ct)
+    {
+        var bytes = Encoding.UTF8.GetBytes(text);
+        await _sendLock.WaitAsync(ct);
+        try
+        {
+            if (socket.State == WebSocketState.Open)
+            {
+                await socket.SendAsync(
+                    new ArraySegment<byte>(bytes),
+                    WebSocketMessageType.Text,
+                    true,
+                    ct);
+            }
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
     }
 
     public void Disconnect()
@@ -124,27 +189,17 @@ public class KickConnection : ConnectionBase
 
             // Подписываемся на события чата chatrooms.{chatroomId}.v2
             string subMessage = $"{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"chatrooms.{chatroomId}.v2\"}}}}";
-            byte[] subBytes = Encoding.UTF8.GetBytes(subMessage);
-
-            await socket.SendAsync(
-                new ArraySegment<byte>(subBytes),
-                WebSocketMessageType.Text,
-                true,
-                _cts.Token);
+            await SendWebSocketTextAsync(socket, subMessage, _cts.Token);
 
             // Если channel_id отличается от chatroom_id, подписываемся также на channel_id
             if (!string.Equals(channelId, chatroomId, StringComparison.OrdinalIgnoreCase))
             {
                 string subChannelMessage = $"{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"chatrooms.{channelId}.v2\"}}}}";
-                byte[] subChannelBytes = Encoding.UTF8.GetBytes(subChannelMessage);
-                await socket.SendAsync(
-                    new ArraySegment<byte>(subChannelBytes),
-                    WebSocketMessageType.Text,
-                    true,
-                    _cts.Token);
+                await SendWebSocketTextAsync(socket, subChannelMessage, _cts.Token);
             }
 
             _webSocket = socket;
+            _lastMessageReceivedUtc = DateTime.UtcNow;
             SetState(ConnectionState.Connected);
             Log.Information("Подключение к Kick {Channel} (ID: {ChannelId}, Chatroom: {ChatroomId}) успешно завершено.", slug, channelId, chatroomId);
 
@@ -292,6 +347,7 @@ public class KickConnection : ConnectionBase
                 }
 
                 string messageText = Encoding.UTF8.GetString(ms.ToArray());
+                _lastMessageReceivedUtc = DateTime.UtcNow;
                 try
                 {
                     ProcessPusherMessage(socket, messageText, ct);
@@ -343,15 +399,16 @@ public class KickConnection : ConnectionBase
         var jsonObj = JObject.Parse(messageText);
         string? eventName = jsonObj["event"]?.ToString();
 
+        // Ответ Pusher на наш ping
+        if (string.Equals(eventName, "pusher:pong", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         // 1. Обработка Ping от Pusher
         if (string.Equals(eventName, "pusher:ping", StringComparison.OrdinalIgnoreCase))
         {
-            var pongBytes = Encoding.UTF8.GetBytes("{\"event\":\"pusher:pong\",\"data\":{}}");
-            _ = socket.SendAsync(
-                new ArraySegment<byte>(pongBytes),
-                WebSocketMessageType.Text,
-                true,
-                ct);
+            _ = SendWebSocketTextAsync(socket, "{\"event\":\"pusher:pong\",\"data\":{}}", ct);
             return;
         }
 
@@ -393,10 +450,8 @@ public class KickConnection : ConnectionBase
         }
     }
 
-    private static async Task HeartbeatLoopAsync(ClientWebSocket socket, CancellationToken ct)
+    private async Task HeartbeatLoopAsync(ClientWebSocket socket, CancellationToken ct)
     {
-        var pingBytes = Encoding.UTF8.GetBytes("{\"event\":\"pusher:ping\",\"data\":{}}");
-
         try
         {
             while (!ct.IsCancellationRequested && socket.State == WebSocketState.Open)
@@ -405,11 +460,7 @@ public class KickConnection : ConnectionBase
 
                 if (socket.State == WebSocketState.Open)
                 {
-                    await socket.SendAsync(
-                        new ArraySegment<byte>(pingBytes),
-                        WebSocketMessageType.Text,
-                        true,
-                        ct);
+                    await SendWebSocketTextAsync(socket, "{\"event\":\"pusher:ping\",\"data\":{}}", ct);
                 }
             }
         }

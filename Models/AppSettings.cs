@@ -16,6 +16,7 @@ public class AppSettings
     public bool CheckboxConnectToGoodgame { get; set; }
     public bool CheckboxConnectToKick { get; set; }
     public bool CheckboxConnectToBluestar { get; set; }
+    public bool AutoReconnectEnabled { get; set; }
 
     public string? SelectedSingleVoice { get; set; }
     public int StandardVoiceVolume { get; set; } = 100;

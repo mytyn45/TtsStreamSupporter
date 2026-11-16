@@ -1,55 +1,157 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:TtsStreamSupporter.ViewModels"
+             xmlns:services="using:TtsStreamSupporter.Services"
              x:Class="TtsStreamSupporter.Views.ConnectionsTab"
              x:DataType="vm:ConnectionsTabViewModel">
 
-    <Grid ColumnDefinitions="Auto, Auto, Auto, Auto" RowDefinitions="Auto, Auto, Auto">
+    <Grid ColumnDefinitions="Auto, Auto, Auto, Auto" RowDefinitions="Auto, Auto, Auto, Auto">
         <!-- Twitch -->
-        <Border Grid.Column="0" Grid.Row="0" BorderBrush="Black" BorderThickness="1" Margin="5">
-            <StackPanel Spacing="10" Margin="5">
+        <Border Grid.Column="0" Grid.Row="0" BorderBrush="Black" BorderThickness="1" CornerRadius="4" Margin="5" Padding="5">
+            <StackPanel Spacing="8" Margin="5">
                 <CheckBox Content="Twitch (ник)" IsChecked="{Binding CheckboxConnectToTwitch}"/>
                 <TextBox ToolTip.Tip="Какой канал слушать" Text="{Binding TwitchNick, FallbackValue=toltoon45}"/>
+                <Border Background="{Binding TwitchStatus.BackgroundBrush}"
+                        CornerRadius="4"
+                        Padding="8,3"
+                        HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding TwitchStatus.StatusText}"
+                               Foreground="{Binding TwitchStatus.ForegroundBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"/>
+                </Border>
             </StackPanel>
         </Border>
 
         <!-- GoodGame -->
-        <Border Grid.Column="1" Grid.Row="0" BorderBrush="Black" BorderThickness="1" Margin="5">
-            <StackPanel Spacing="10" Margin="5">
+        <Border Grid.Column="1" Grid.Row="0" BorderBrush="Black" BorderThickness="1" CornerRadius="4" Margin="5" Padding="5">
+            <StackPanel Spacing="8" Margin="5">
                 <CheckBox Content="Goodgame (ник)" IsChecked="{Binding CheckboxConnectToGoodgame}"/>
                 <TextBox ToolTip.Tip="Какой канал слушать" Text="{Binding GoodgameNick, FallbackValue=toltoon45}"/>
+                <Border Background="{Binding GoodgameStatus.BackgroundBrush}"
+                        CornerRadius="4"
+                        Padding="8,3"
+                        HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding GoodgameStatus.StatusText}"
+                               Foreground="{Binding GoodgameStatus.ForegroundBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"/>
+                </Border>
             </StackPanel>
         </Border>
 
         <!-- Kick -->
-        <Border Grid.Column="2" Grid.Row="0" BorderBrush="Black" BorderThickness="1" Margin="5">
-            <StackPanel Spacing="10" Margin="5">
+        <Border Grid.Column="2" Grid.Row="0" BorderBrush="Black" BorderThickness="1" CornerRadius="4" Margin="5" Padding="5">
+            <StackPanel Spacing="8" Margin="5">
                 <CheckBox Content="Kick (ник)" IsChecked="{Binding CheckboxConnectToKick}"/>
                 <TextBox ToolTip.Tip="Какой канал слушать" Text="{Binding KickNick, FallbackValue=toltoon45}"/>
+                <Border Background="{Binding KickStatus.BackgroundBrush}"
+                        CornerRadius="4"
+                        Padding="8,3"
+                        HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding KickStatus.StatusText}"
+                               Foreground="{Binding KickStatus.ForegroundBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"/>
+                </Border>
             </StackPanel>
         </Border>
 
         <!-- BlueStar -->
-        <Border Grid.Column="3" Grid.Row="0" BorderBrush="Black" BorderThickness="1" Margin="5">
-            <StackPanel Spacing="10" Margin="5">
+        <Border Grid.Column="3" Grid.Row="0" BorderBrush="Black" BorderThickness="1" CornerRadius="4" Margin="5" Padding="5">
+            <StackPanel Spacing="8" Margin="5">
                 <CheckBox Content="BlueStar (api)" IsChecked="{Binding CheckboxConnectToBluestar}"/>
-                <TextBox ToolTip.Tip="Какой канал слушать" Text="{Binding BluestarApi, FallbackValue=xxx-xxx-xxx}" MaxWidth="100"/>
+                <TextBox ToolTip.Tip="API токен для BlueStar" Text="{Binding BluestarApi, FallbackValue=xxx-xxx-xxx}"/>
+                <Border Background="{Binding BluestarStatus.BackgroundBrush}"
+                        CornerRadius="4"
+                        Padding="8,3"
+                        HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding BluestarStatus.StatusText}"
+                               Foreground="{Binding BluestarStatus.ForegroundBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"/>
+                </Border>
             </StackPanel>
         </Border>
 
         <!-- Кнопки управления -->
-        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="10" Margin="5">
+        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="10" Margin="5" VerticalAlignment="Center">
             <Button Content="Подключиться" Command="{Binding ButtonConnectToChats}"/>
             <Button Content="Переподключиться" Command="{Binding ButtonReconnectToChats}"/>
+            <CheckBox Content="Авто-переподключение"
+                      IsChecked="{Binding AutoReconnectEnabled}"
+                      VerticalAlignment="Center"
+                      ToolTip.Tip="Автоматически проверять наличие реального ответа от серверов и переподключаться при потере связи"/>
         </StackPanel>
 
+        <!-- Состояние всех серверов -->
+        <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4"
+                BorderBrush="#D0D0D0" BorderThickness="1" CornerRadius="6"
+                Padding="10" Margin="5" Background="#FAFAFA">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Состояние всех серверов" FontWeight="Bold" FontSize="13"/>
+                <WrapPanel Orientation="Horizontal">
+                    <!-- Стриминговые сервисы -->
+                    <ItemsControl ItemsSource="{Binding Connections}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ConnectionStatusViewModel">
+                                <Border Background="{Binding BackgroundBrush}"
+                                        CornerRadius="5"
+                                        Padding="10,6"
+                                        MinWidth="90"
+                                        Margin="0,0,8,4">
+                                    <StackPanel Orientation="Vertical" Spacing="2" HorizontalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontWeight="Bold"
+                                                   FontSize="12"
+                                                   Foreground="{Binding ForegroundBrush}"
+                                                   HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   FontSize="11"
+                                                   Foreground="{Binding ForegroundBrush}"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Голосовые серверы NTTS -->
+                    <Border Background="{Binding NttsHealth.StatusBackgroundBrush}"
+                            BorderBrush="{Binding NttsHealth.StatusBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="5"
+                            Padding="10,6"
+                            Margin="0,0,0,4">
+                        <StackPanel Orientation="Vertical" Spacing="2">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="{Binding NttsHealth.StatusIcon}" FontSize="12"/>
+                                <TextBlock Text="NTTS Серверы"
+                                           FontWeight="Bold"
+                                           FontSize="12"
+                                           Foreground="{Binding NttsHealth.StatusForegroundBrush}"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding NttsHealth.StatusText}"
+                                       FontSize="11"
+                                       Foreground="{Binding NttsHealth.StatusForegroundBrush}"/>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
         <!-- Настройки задержки TTS -->
-        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4" Margin="5">
+        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="4" Margin="5">
             <Label Content="Искусственная задержка для TTS МЕЖДУ сообщениями"/>
             <CheckBox Content="Включить" IsChecked="{Binding TtsDelayEnabled}"/>
             <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                 <Slider Minimum="0" Maximum="10" Value="{Binding TtsDelayTime}" Width="100"/>
-                <Label Content="{Binding TtsDelayTime}"/>
+                <Label Content="{Binding TtsDelayLabelDisplay}"/>
             </StackPanel>
         </StackPanel>
     </Grid>

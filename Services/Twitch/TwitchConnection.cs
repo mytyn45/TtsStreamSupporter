@@ -40,6 +40,48 @@ public class TwitchConnection : ConnectionBase
         await ConnectAsync(channelName);
     }
 
+    public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
+    {
+        if (State != ConnectionState.Connected || _client == null || !_client.Connected || _writer == null || _reader == null)
+        {
+            return false;
+        }
+
+        var elapsed = DateTime.UtcNow - _lastMessageReceivedUtc;
+        if (elapsed < TimeSpan.FromSeconds(30))
+        {
+            return true;
+        }
+
+        // Если данных не было больше 30 секунд — отправляем PING и проверяем ответ сервера
+        var lastReceivedBeforePing = _lastMessageReceivedUtc;
+        try
+        {
+            await SendRawLineAsync("PING :tmi.twitch.tv", ct);
+
+            var startWait = DateTime.UtcNow;
+            while (DateTime.UtcNow - startWait < TimeSpan.FromSeconds(5))
+            {
+                if (ct.IsCancellationRequested || _client == null || !_client.Connected)
+                    return false;
+
+                if (_lastMessageReceivedUtc > lastReceivedBeforePing)
+                {
+                    return true;
+                }
+
+                await Task.Delay(250, ct);
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Ошибка при проверке связи с Twitch: {Error}", ex.Message);
+            return false;
+        }
+    }
+
     public async Task ConnectAsync(string? channelName)
     {
         if (string.IsNullOrWhiteSpace(channelName))

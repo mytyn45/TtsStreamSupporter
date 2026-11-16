@@ -22,6 +22,8 @@ public class BluestarConnection : ConnectionBase
     private CancellationTokenSource? _cts;
     private Task? _lifecycleTask;
     private int _reconnectDelayMs = 1000;
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private DateTime _lastMessageReceivedUtc = DateTime.MinValue;
 
     public BluestarConnection()
     {
@@ -32,6 +34,44 @@ public class BluestarConnection : ConnectionBase
     {
         Disconnect();
         await ConnectAsync(token);
+    }
+
+    public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
+    {
+        var ws = _socket;
+        if (State != ConnectionState.Connected || ws == null || ws.State != WebSocketState.Open || ws.CloseStatus != null)
+        {
+            return false;
+        }
+
+        var elapsed = DateTime.UtcNow - _lastMessageReceivedUtc;
+        if (elapsed < TimeSpan.FromSeconds(60))
+        {
+            return true;
+        }
+
+        try
+        {
+            await _sendLock.WaitAsync(ct);
+            try
+            {
+                if (ws.State != WebSocketState.Open)
+                    return false;
+
+                var pingBytes = Encoding.UTF8.GetBytes("{\"type\":\"ping\"}");
+                await ws.SendAsync(new ArraySegment<byte>(pingBytes), WebSocketMessageType.Text, true, ct);
+                return true;
+            }
+            finally
+            {
+                _sendLock.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Ошибка при проверке сокета Bluestar: {Error}", ex.Message);
+            return false;
+        }
     }
 
     public void Disconnect()
@@ -165,6 +205,7 @@ public class BluestarConnection : ConnectionBase
 
         await _socket.ConnectAsync(uri, ct);
 
+        _lastMessageReceivedUtc = DateTime.UtcNow;
         SetState(ConnectionState.Connected);
 
         Log.Information("Bluestar: подключено");
@@ -197,6 +238,7 @@ public class BluestarConnection : ConnectionBase
             } while (!result.EndOfMessage);
 
             var json = Encoding.UTF8.GetString(ms.ToArray());
+            _lastMessageReceivedUtc = DateTime.UtcNow;
 
             HandleRawMessage(json);
         }

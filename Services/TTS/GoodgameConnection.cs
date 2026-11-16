@@ -28,6 +28,8 @@ public class GoodgameConnection : ConnectionBase
     private CancellationTokenSource? _cts;
     private Task? _readTask;
     private string? _channelName;
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private DateTime _lastMessageReceivedUtc = DateTime.MinValue;
 
     public GoodgameConnection()
     {
@@ -47,6 +49,69 @@ public class GoodgameConnection : ConnectionBase
     {
         Disconnect();
         await ConnectAsync(channelToConnect);
+    }
+
+    public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
+    {
+        var ws = _webSocket;
+        if (State != ConnectionState.Connected || ws == null || ws.State != WebSocketState.Open)
+        {
+            return false;
+        }
+
+        var elapsed = DateTime.UtcNow - _lastMessageReceivedUtc;
+        if (elapsed < TimeSpan.FromSeconds(30))
+        {
+            return true;
+        }
+
+        var lastReceivedBeforePing = _lastMessageReceivedUtc;
+        try
+        {
+            await SendWebSocketTextAsync(ws, "{\"type\":\"ping\"}", ct);
+
+            var startWait = DateTime.UtcNow;
+            while (DateTime.UtcNow - startWait < TimeSpan.FromSeconds(5))
+            {
+                if (ct.IsCancellationRequested || ws.State != WebSocketState.Open)
+                    return false;
+
+                if (_lastMessageReceivedUtc > lastReceivedBeforePing)
+                {
+                    return true;
+                }
+
+                await Task.Delay(250, ct);
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Ошибка при проверке связи с GoodGame: {Error}", ex.Message);
+            return false;
+        }
+    }
+
+    private async Task SendWebSocketTextAsync(ClientWebSocket socket, string text, CancellationToken ct)
+    {
+        var bytes = Encoding.UTF8.GetBytes(text);
+        await _sendLock.WaitAsync(ct);
+        try
+        {
+            if (socket.State == WebSocketState.Open)
+            {
+                await socket.SendAsync(
+                    new ArraySegment<byte>(bytes),
+                    WebSocketMessageType.Text,
+                    true,
+                    ct);
+            }
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
     }
 
     public void Disconnect()
@@ -140,15 +205,10 @@ public class GoodgameConnection : ConnectionBase
             };
 
             string jsonMessage = System.Text.Json.JsonSerializer.Serialize(message);
-            byte[] bufferToSend = Encoding.UTF8.GetBytes(jsonMessage);
-
-            await socket.SendAsync(
-                new ArraySegment<byte>(bufferToSend),
-                WebSocketMessageType.Text,
-                true,
-                _cts.Token);
+            await SendWebSocketTextAsync(socket, jsonMessage, _cts.Token);
 
             _webSocket = socket;
+            _lastMessageReceivedUtc = DateTime.UtcNow;
             SetState(ConnectionState.Connected);
             Log.Information("Подключение к GoodGame {Channel} (ID: {ChannelId}) завершено.", channelToConnect, channelId);
 
@@ -199,6 +259,7 @@ public class GoodgameConnection : ConnectionBase
                 }
 
                 string receivedMessage = Encoding.UTF8.GetString(ms.ToArray());
+                _lastMessageReceivedUtc = DateTime.UtcNow;
                 try
                 {
                     JObject jsonObj = JObject.Parse(receivedMessage);
@@ -207,12 +268,13 @@ public class GoodgameConnection : ConnectionBase
                     // Сервер GoodGame отправляет heartbeat {"type":"ping"} — отвечаем pong, чтобы соединение не рвалось
                     if (string.Equals(messageType, "ping", StringComparison.OrdinalIgnoreCase))
                     {
-                        var pongBytes = Encoding.UTF8.GetBytes("{\"type\":\"pong\"}");
-                        await socket.SendAsync(
-                            new ArraySegment<byte>(pongBytes),
-                            WebSocketMessageType.Text,
-                            true,
-                            ct);
+                        await SendWebSocketTextAsync(socket, "{\"type\":\"pong\"}", ct);
+                        continue;
+                    }
+
+                    // Ответ на наш пинг
+                    if (string.Equals(messageType, "pong", StringComparison.OrdinalIgnoreCase))
+                    {
                         continue;
                     }
 

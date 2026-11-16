@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -16,6 +17,14 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
     private readonly GoodgameConnection _goodgameConnection;
     private readonly KickConnection _kickConnection;
     private readonly BluestarConnection _bluestarConnection;
+    private readonly NttsHealthCheckService _nttsHealthCheck;
+
+    public NttsHealthCheckService NttsHealth => _nttsHealthCheck;
+
+    public ConnectionStatusViewModel TwitchStatus { get; }
+    public ConnectionStatusViewModel GoodgameStatus { get; }
+    public ConnectionStatusViewModel KickStatus { get; }
+    public ConnectionStatusViewModel BluestarStatus { get; }
 
     private bool _isBusy;
 
@@ -46,6 +55,9 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
     private bool _checkboxConnectToBluestar;
 
     [ObservableProperty]
+    private bool _autoReconnectEnabled;
+
+    [ObservableProperty]
     private bool _ttsDelayEnabled;
 
     [ObservableProperty]
@@ -59,19 +71,21 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
         TwitchConnection twitchConnection,
         GoodgameConnection goodgameConnection,
         KickConnection kickConnection,
-        BluestarConnection bluestarConnection)
+        BluestarConnection bluestarConnection,
+        NttsHealthCheckService nttsHealthCheck)
     {
         _settings = settings;
         _twitchConnection = twitchConnection;
         _goodgameConnection = goodgameConnection;
         _kickConnection = kickConnection;
         _bluestarConnection = bluestarConnection;
+        _nttsHealthCheck = nttsHealthCheck;
 
         // Инициализация статусов подключений
-        SubscribeConnection("Twitch", _twitchConnection);
-        SubscribeConnection("GoodGame", _goodgameConnection);
-        SubscribeConnection("Kick", _kickConnection);
-        SubscribeConnection("Bluestar", _bluestarConnection);
+        TwitchStatus = CreateAndSubscribeConnection("Twitch", _twitchConnection);
+        GoodgameStatus = CreateAndSubscribeConnection("GoodGame", _goodgameConnection);
+        KickStatus = CreateAndSubscribeConnection("Kick", _kickConnection);
+        BluestarStatus = CreateAndSubscribeConnection("Bluestar", _bluestarConnection);
 
         // Загрузка настроек
         _twitchNick = _settings.Settings.TwitchNick;
@@ -86,16 +100,26 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
         _bluestarApi = _settings.Settings.BluestarApi;
         _checkboxConnectToBluestar = _settings.Settings.CheckboxConnectToBluestar;
 
+        _autoReconnectEnabled = _settings.Settings.AutoReconnectEnabled;
+        if (_autoReconnectEnabled)
+        {
+            StartAutoReconnectTimer(initialDelayMs: 3000);
+        }
+
         _ttsDelayEnabled = _settings.Settings.TtsDelayEnabled;
         _ttsDelayTime = _settings.Settings.TtsDelayTime;
+
+        // Первичный опрос серверов NTTS для отображения актуального статуса
+        _ = _nttsHealthCheck.PerformHealthCheckAndUpdateStatusAsync();
     }
 
-    private void SubscribeConnection(string name, ConnectionBase connection)
+    private ConnectionStatus CreateAndSubscribeConnection(string name, ConnectionBase connection)
     {
         var status = new ConnectionStatus(name, connection.State);
         Connections.Add(status);
 
         connection.StateChanged += state => OnConnectionStateChanged(status, state);
+        return status;
     }
 
     private static void OnConnectionStateChanged(ConnectionStatus status, ConnectionState state)
@@ -154,6 +178,21 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
         _ = _settings.DelayedSave();
     }
 
+    partial void OnAutoReconnectEnabledChanged(bool value)
+    {
+        _settings.Settings.AutoReconnectEnabled = value;
+        _ = _settings.DelayedSave();
+
+        if (value)
+        {
+            StartAutoReconnectTimer(initialDelayMs: 500);
+        }
+        else
+        {
+            StopAutoReconnectTimer();
+        }
+    }
+
     partial void OnTtsDelayEnabledChanged(bool value)
     {
         _settings.Settings.TtsDelayEnabled = value;
@@ -172,6 +211,7 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
         if (_isBusy)
             return;
 
+        await _reconnectLock.WaitAsync();
         _isBusy = true;
         try
         {
@@ -206,6 +246,7 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
         finally
         {
             _isBusy = false;
+            _reconnectLock.Release();
         }
     }
 
@@ -215,6 +256,7 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
         if (_isBusy)
             return;
 
+        await _reconnectLock.WaitAsync();
         _isBusy = true;
         try
         {
@@ -267,6 +309,7 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
         finally
         {
             _isBusy = false;
+            _reconnectLock.Release();
         }
     }
 
@@ -274,7 +317,185 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand ButtonConnectToChats => ConnectToChatsCommand;
     public IAsyncRelayCommand ButtonReconnectToChats => ReconnectToChatsCommand;
 
+    private CancellationTokenSource? _autoReconnectCts;
+    private readonly SemaphoreSlim _reconnectLock = new(1, 1);
+
+    private void StartAutoReconnectTimer(int initialDelayMs = 0)
+    {
+        StopAutoReconnectTimer();
+        _autoReconnectCts = new CancellationTokenSource();
+        var token = _autoReconnectCts.Token;
+        Task.Run(() => AutoReconnectLoopAsync(initialDelayMs, token), token);
+    }
+
+    private void StopAutoReconnectTimer()
+    {
+        try
+        {
+            _autoReconnectCts?.Cancel();
+            _autoReconnectCts?.Dispose();
+        }
+        catch { }
+        _autoReconnectCts = null;
+    }
+
+    private async Task AutoReconnectLoopAsync(int initialDelayMs, CancellationToken ct)
+    {
+        if (initialDelayMs > 0)
+        {
+            try
+            {
+                await Task.Delay(initialDelayMs, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await CheckAndReconnectServicesAsync(ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Ошибка в фоновом цикле авто-переподключения");
+            }
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(15), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+    }
+
+    private async Task CheckAndReconnectServicesAsync(CancellationToken ct)
+    {
+        if (_isBusy || !AutoReconnectEnabled)
+            return;
+
+        if (!await _reconnectLock.WaitAsync(0, ct))
+            return;
+
+        _isBusy = true;
+        try
+        {
+            // 1. Twitch
+            if (CheckboxConnectToTwitch && !string.IsNullOrWhiteSpace(TwitchNick))
+            {
+                bool isHealthy = false;
+                try
+                {
+                    isHealthy = await _twitchConnection.CheckHealthAsync(ct);
+                }
+                catch { }
+
+                if (!isHealthy && !ct.IsCancellationRequested && CheckboxConnectToTwitch)
+                {
+                    Log.Warning("Авто-переподключение: потеряна связь с Twitch #{Nick} (или нет ответа). Переподключение...", TwitchNick);
+                    try
+                    {
+                        await _twitchConnection.ReconnectAsync(TwitchNick);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Ошибка при авто-переподключении к Twitch");
+                    }
+                }
+            }
+
+            // 2. Goodgame
+            if (CheckboxConnectToGoodgame && !string.IsNullOrWhiteSpace(GoodgameNick))
+            {
+                bool isHealthy = false;
+                try
+                {
+                    isHealthy = await _goodgameConnection.CheckHealthAsync(ct);
+                }
+                catch { }
+
+                if (!isHealthy && !ct.IsCancellationRequested && CheckboxConnectToGoodgame)
+                {
+                    Log.Warning("Авто-переподключение: потеряна связь с GoodGame {Nick} (или нет ответа). Переподключение...", GoodgameNick);
+                    try
+                    {
+                        await _goodgameConnection.ReconnectAsync(GoodgameNick);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Ошибка при авто-переподключении к GoodGame");
+                    }
+                }
+            }
+
+            // 3. Kick
+            if (CheckboxConnectToKick && !string.IsNullOrWhiteSpace(KickNick))
+            {
+                bool isHealthy = false;
+                try
+                {
+                    isHealthy = await _kickConnection.CheckHealthAsync(ct);
+                }
+                catch { }
+
+                if (!isHealthy && !ct.IsCancellationRequested && CheckboxConnectToKick)
+                {
+                    Log.Warning("Авто-переподключение: потеряна связь с Kick {Nick} (или нет ответа). Переподключение...", KickNick);
+                    try
+                    {
+                        await _kickConnection.ReconnectAsync(KickNick);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Ошибка при авто-переподключении к Kick");
+                    }
+                }
+            }
+
+            // 4. Bluestar
+            if (CheckboxConnectToBluestar && !string.IsNullOrWhiteSpace(BluestarApi))
+            {
+                bool isHealthy = false;
+                try
+                {
+                    isHealthy = await _bluestarConnection.CheckHealthAsync(ct);
+                }
+                catch { }
+
+                if (!isHealthy && !ct.IsCancellationRequested && CheckboxConnectToBluestar)
+                {
+                    Log.Warning("Авто-переподключение: потеряна связь с Bluestar (или нет ответа). Переподключение...");
+                    try
+                    {
+                        await _bluestarConnection.ReconnectAsync(BluestarApi);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Ошибка при авто-переподключении к Bluestar");
+                    }
+                }
+            }
+        }
+        finally
+        {
+            _isBusy = false;
+            _reconnectLock.Release();
+        }
+    }
+
     public void Dispose()
     {
+        StopAutoReconnectTimer();
+        _reconnectLock.Dispose();
     }
 }
