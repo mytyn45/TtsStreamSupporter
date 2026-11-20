@@ -124,15 +124,17 @@ public static class FuzzyMatcher
 
     /// <summary>
     /// Ищет наилучшую замену для слова:
-    /// 1. Сначала точное совпадение.
-    /// 2. Если не найдено и configuredMaxErrors > 0, ищет ближайшее слово.
+    /// 1. Сначала точное совпадение (если слово не в исключениях).
+    /// 2. Если не найдено и configuredMaxErrors > 0, ищет ближайшее слово (пропуская исключения).
     /// 3. При обнаружении конфликта (два разных правила с одинаковым минимальным расстоянием) возвращает false.
+    /// Если входное слово находится в списке исключений, замена категорически запрещена.
     /// </summary>
     public static bool FindBestMatch(
         string inputWord,
         IDictionary<string, string>? replacements,
         int configuredMaxErrors,
-        out string? bestReplacement)
+        out string? bestReplacement,
+        IReadOnlyCollection<string>? exceptions = null)
     {
         bestReplacement = null;
 
@@ -141,9 +143,20 @@ public static class FuzzyMatcher
 
         string trimmed = inputWord.Trim();
 
+        // Если само входное слово в списке исключений — замена категорически запрещена
+        if (exceptions != null && ContainsException(exceptions, trimmed))
+            return false;
+
         // 1. Точное совпадение (всегда приоритет)
         if (replacements.TryGetValue(trimmed, out bestReplacement))
+        {
+            if (exceptions != null && ContainsException(exceptions, trimmed))
+            {
+                bestReplacement = null;
+                return false;
+            }
             return true;
+        }
 
         if (configuredMaxErrors <= 0 || trimmed.Length <= 2)
             return false;
@@ -156,6 +169,10 @@ public static class FuzzyMatcher
         foreach (var (key, value) in replacements)
         {
             if (string.IsNullOrWhiteSpace(key) || key.Contains(' '))
+                continue;
+
+            // Если исходное слово правила находится в исключениях — не применяем его
+            if (exceptions != null && ContainsException(exceptions, key))
                 continue;
 
             int maxAllowed = GetMaxAllowedErrors(key, configuredMaxErrors);
@@ -192,6 +209,20 @@ public static class FuzzyMatcher
         }
 
         bestReplacement = null;
+        return false;
+    }
+
+    private static bool ContainsException(IReadOnlyCollection<string> exceptions, string word)
+    {
+        if (exceptions is HashSet<string> hashSet && hashSet.Comparer == StringComparer.OrdinalIgnoreCase)
+            return hashSet.Contains(word);
+
+        foreach (var ex in exceptions)
+        {
+            if (string.Equals(ex, word, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
         return false;
     }
 }

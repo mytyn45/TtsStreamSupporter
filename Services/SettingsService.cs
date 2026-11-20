@@ -122,15 +122,28 @@ public class SettingsService
 
                 if (Settings.ListBoxItemSourceBlackList == null)
                     Settings.ListBoxItemSourceBlackList = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                else
+                    Settings.ListBoxItemSourceBlackList = new HashSet<string>(Settings.ListBoxItemSourceBlackList, StringComparer.OrdinalIgnoreCase);
 
                 if (Settings.WordReplacements == null)
                     Settings.WordReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                else
+                    Settings.WordReplacements = new Dictionary<string, string>(Settings.WordReplacements, StringComparer.OrdinalIgnoreCase);
 
                 if (Settings.WordReplacementDates == null)
                     Settings.WordReplacementDates = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+                else
+                    Settings.WordReplacementDates = new Dictionary<string, DateTime>(Settings.WordReplacementDates, StringComparer.OrdinalIgnoreCase);
+
+                if (Settings.WordReplacementExceptions == null)
+                    Settings.WordReplacementExceptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                else
+                    Settings.WordReplacementExceptions = new HashSet<string>(Settings.WordReplacementExceptions, StringComparer.OrdinalIgnoreCase);
 
                 if (Settings.CharWordReplacements == null)
                     Settings.CharWordReplacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                else
+                    Settings.CharWordReplacements = new Dictionary<string, string>(Settings.CharWordReplacements, StringComparer.OrdinalIgnoreCase);
 
                 if (Settings.IndividualVoices == null)
                     Settings.IndividualVoices = new();

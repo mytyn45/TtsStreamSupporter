@@ -124,6 +124,21 @@ public partial class TtsTabViewModel : ViewModelBase
     public ObservableCollection<string> ListBoxItemSourceBlacklist { get; } = new();
 
     // =========================================================
+    // ИСКЛЮЧЕНИЯ ДЛЯ ЗАМЕНЫ СЛОВ
+    // =========================================================
+
+    [ObservableProperty]
+    private string? _textBoxAddExceptionWord;
+
+    [ObservableProperty]
+    private string? _selectedExceptionWord;
+
+    public ObservableCollection<string> ListBoxItemSourceWordExceptions { get; } = new();
+
+    [ObservableProperty]
+    private bool _isWordExceptionFound;
+
+    // =========================================================
     // ЗАМЕНА СЛОВ
     // =========================================================
 
@@ -272,6 +287,13 @@ public partial class TtsTabViewModel : ViewModelBase
         // Черный список
         foreach (var user in _settings.Settings.ListBoxItemSourceBlackList)
             ListBoxItemSourceBlacklist.Add(user);
+
+        // Исключения замены слов
+        if (_settings.Settings.WordReplacementExceptions != null)
+        {
+            foreach (var exc in _settings.Settings.WordReplacementExceptions)
+                ListBoxItemSourceWordExceptions.Add(exc);
+        }
 
         // Замена слов
         SliderWordFuzzyThreshold = _settings.Settings.WordReplacementMaxErrors;
@@ -587,6 +609,51 @@ public partial class TtsTabViewModel : ViewModelBase
         _ = _settings.DelayedSave();
     }
 
+    // =========================================================
+    // ИСКЛЮЧЕНИЯ ДЛЯ ЗАМЕНЫ СЛОВ
+    // =========================================================
+
+    [RelayCommand]
+    private void AddWordException()
+    {
+        string? word = TextBoxAddExceptionWord?.Trim();
+        if (string.IsNullOrWhiteSpace(word))
+            return;
+
+        if (!ListBoxItemSourceWordExceptions.Any(x => string.Equals(x, word, StringComparison.OrdinalIgnoreCase)))
+        {
+            ListBoxItemSourceWordExceptions.Insert(0, word);
+            _settings.Settings.WordReplacementExceptions = ListBoxItemSourceWordExceptions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _ = _settings.DelayedSave();
+            ApplyFilter();
+        }
+
+        TextBoxAddExceptionWord = string.Empty;
+    }
+
+    [RelayCommand]
+    private void RemoveWordException()
+    {
+        if (SelectedExceptionWord == null)
+            return;
+
+        ListBoxItemSourceWordExceptions.Remove(SelectedExceptionWord);
+        _settings.Settings.WordReplacementExceptions = ListBoxItemSourceWordExceptions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _ = _settings.DelayedSave();
+        ApplyFilter();
+    }
+
+    [RelayCommand]
+    private void ClearWordExceptionInput()
+    {
+        TextBoxAddExceptionWord = string.Empty;
+    }
+
+    public void PopulateWordExceptionInput(string word)
+    {
+        TextBoxAddExceptionWord = word;
+    }
+
 
     // =========================================================
     // WORD REPLACEMENTS
@@ -727,11 +794,15 @@ public partial class TtsTabViewModel : ViewModelBase
         bool hasWordQuery = !string.IsNullOrEmpty(queryWord);
         bool hasRepQuery = !string.IsNullOrEmpty(queryRep);
 
-        // 1. Сброс конфликтов у всех правил
+        // 1. Сброс конфликтов и обновление статуса исключений у всех правил
+        var exceptions = _settings.Settings.WordReplacementExceptions;
+        bool hasExceptions = exceptions != null && exceptions.Count > 0;
+
         foreach (var item in _allWordReplacements)
         {
             item.IsConflict = false;
             item.ConflictWith = null;
+            item.IsException = hasExceptions && exceptions!.Contains(item.Word);
         }
 
         // 2. Попарный поиск конфликтов между существующими правилами
@@ -854,6 +925,9 @@ public partial class TtsTabViewModel : ViewModelBase
             IsConflictFound = false;
             ConflictWarningText = null;
         }
+
+        // 5. Проверка, находится ли вводимое слово в списке исключений
+        IsWordExceptionFound = hasWordQuery && hasExceptions && exceptions!.Contains(queryWord);
     }
 
     // =========================================================
@@ -990,4 +1064,7 @@ public partial class TtsTabViewModel : ViewModelBase
     public IRelayCommand ButtonRemoveCharReplacement => RemoveCharReplacementCommand;
     public IRelayCommand ButtonClearCharReplacementInputs => ClearCharReplacementInputsCommand;
     public IRelayCommand<string?> ButtonToggleWordSort => ToggleWordSortCommand;
+    public IRelayCommand ButtonAddWordException => AddWordExceptionCommand;
+    public IRelayCommand ButtonRemoveWordException => RemoveWordExceptionCommand;
+    public IRelayCommand ButtonClearWordExceptionInput => ClearWordExceptionInputCommand;
 }

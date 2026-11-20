@@ -151,11 +151,14 @@ public class TtsMessageProcessing
 
         if (_settings.Settings.WordReplacements is { Count: > 0 })
         {
-            // 1. Сначала заменяем фразы, содержащие пробелы
+            // 1. Сначала заменяем фразы, содержащие пробелы (пропуская исключения)
             foreach (var kvp in _settings.Settings.WordReplacements)
             {
                 if (kvp.Key.Contains(' ') && !string.IsNullOrWhiteSpace(kvp.Key))
                 {
+                    if (IsWordException(kvp.Key))
+                        continue;
+
                     processedMessage = Regex.Replace(
                         processedMessage,
                         Regex.Escape(kvp.Key),
@@ -175,7 +178,12 @@ public class TtsMessageProcessing
 
                 var (leading, core, trailing) = SplitPunctuation(word);
 
-                if (!string.IsNullOrEmpty(core) && TryGetWordReplacement(core, out string? coreReplacement))
+                // Если слово (с пунктуацией или без нее) находится в списке исключений — замена запрещена
+                if ((!string.IsNullOrEmpty(core) && IsWordException(core)) || IsWordException(word))
+                {
+                    processed.Append(word);
+                }
+                else if (!string.IsNullOrEmpty(core) && TryGetWordReplacement(core, out string? coreReplacement))
                 {
                     processed.Append(leading).Append(coreReplacement).Append(trailing);
                 }
@@ -209,6 +217,15 @@ public class TtsMessageProcessing
                     continue;
 
                 var (leading, core, trailing) = SplitPunctuation(word);
+
+                // Если слово в списке исключений, защищаем его и от замены по частям символов
+                if ((!string.IsNullOrEmpty(core) && IsWordException(core)) || IsWordException(word))
+                {
+                    processed.Append(word);
+                    processed.Append(' ');
+                    continue;
+                }
+
                 string target = !string.IsNullOrEmpty(core) ? core : word;
 
                 if (TryGetCharWordReplacement(target, out string? replacement))
@@ -320,9 +337,14 @@ public class TtsMessageProcessing
 
     private bool TryGetWordReplacement(string word, out string? replacement)
     {
+        replacement = null;
+        if (string.IsNullOrWhiteSpace(word) || IsWordException(word))
+        {
+            return false;
+        }
+
         if (_settings.Settings.WordReplacements == null || _settings.Settings.WordReplacements.Count == 0)
         {
-            replacement = null;
             return false;
         }
 
@@ -332,7 +354,21 @@ public class TtsMessageProcessing
             return _settings.Settings.WordReplacements.TryGetValue(word, out replacement);
         }
 
-        return FuzzyMatcher.FindBestMatch(word, _settings.Settings.WordReplacements, maxErrors, out replacement);
+        return FuzzyMatcher.FindBestMatch(
+            word,
+            _settings.Settings.WordReplacements,
+            maxErrors,
+            out replacement,
+            _settings.Settings.WordReplacementExceptions);
+    }
+
+    private bool IsWordException(string? word)
+    {
+        if (string.IsNullOrWhiteSpace(word))
+            return false;
+
+        var exceptions = _settings.Settings.WordReplacementExceptions;
+        return exceptions is { Count: > 0 } && exceptions.Contains(word.Trim());
     }
 
     private bool TryGetCharWordReplacement(string word, out string? replacement)

@@ -39,4 +39,16 @@ public partial class TtsTab : UserControl
             }
         }
     }
+
+    private void OnWordExceptionsDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Source is Visual visual)
+        {
+            var item = visual.FindAncestorOfType<ListBoxItem>()?.DataContext as string;
+            if (item != null && DataContext is TtsTabViewModel vm)
+            {
+                vm.PopulateWordExceptionInput(item);
+            }
+        }
+    }
 }

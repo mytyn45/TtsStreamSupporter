@@ -277,6 +277,18 @@
                                                FontWeight="SemiBold"
                                                FontSize="12"/>
                                 </Border>
+
+                                <Border Background="#EDE7F6"
+                                        BorderBrush="#7E57C2"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="6,3"
+                                        IsVisible="{Binding IsWordExceptionFound}">
+                                    <TextBlock Text="Это слово находится в списке исключений и не будет заменяться"
+                                               Foreground="#512DA8"
+                                               FontWeight="Bold"
+                                               FontSize="12"/>
+                                </Border>
                             </StackPanel>
 
                             <!-- Заголовки колонок с сортировкой -->
@@ -389,6 +401,17 @@
                                                                     Padding="4,1"
                                                                     ToolTip.Tip="{Binding ConflictBadgeText}">
                                                                 <TextBlock Text="{Binding ConflictBadgeText}"
+                                                                           FontSize="10"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="White"/>
+                                                            </Border>
+                                                            <Border IsVisible="{Binding IsException}"
+                                                                    Background="#7E57C2"
+                                                                    CornerRadius="3"
+                                                                    Margin="4,0,0,0"
+                                                                    Padding="4,1"
+                                                                    ToolTip.Tip="Слово в списке исключений и не будет заменяться">
+                                                                <TextBlock Text="В исключениях"
                                                                            FontSize="10"
                                                                            FontWeight="Bold"
                                                                            Foreground="White"/>
@@ -589,6 +612,50 @@
                                     ClipToBounds="True">
                                 <ListBox ItemsSource="{Binding ListBoxItemSourceBlacklist}"
                                          SelectedItem="{Binding SelectedBlacklistItem}"
+                                         MinHeight="280"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.IsScrollInertiaEnabled="True">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Padding="4,2" TextWrapping="Wrap"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- Вкладка 4: Исключения -->
+                    <TabItem Header="Исключения">
+                        <Grid RowDefinitions="Auto,*" RowSpacing="6" Margin="0,6,0,0">
+                            <!-- Форма ввода -->
+                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
+                                <TextBox Grid.Column="0"
+                                         PlaceholderText="Слово-исключение"
+                                         Text="{Binding TextBoxAddExceptionWord}"/>
+                                <Button Grid.Column="1"
+                                        Content="✕"
+                                        ToolTip.Tip="Очистить поле ввода"
+                                        Command="{Binding ButtonClearWordExceptionInput}"
+                                        VerticalAlignment="Center"
+                                        Padding="8,5"/>
+                                <Button Grid.Column="2"
+                                        Content="Добавить"
+                                        Command="{Binding ButtonAddWordException}"/>
+                                <Button Grid.Column="3"
+                                        Content="Удалить"
+                                        Command="{Binding ButtonRemoveWordException}"/>
+                            </Grid>
+
+                            <!-- Список -->
+                            <Border Grid.Row="1"
+                                    BorderBrush="#E0E0E0" BorderThickness="1"
+                                    CornerRadius="4"
+                                    ClipToBounds="True">
+                                <ListBox ItemsSource="{Binding ListBoxItemSourceWordExceptions}"
+                                         SelectedItem="{Binding SelectedExceptionWord}"
+                                         DoubleTapped="OnWordExceptionsDoubleTapped"
                                          MinHeight="280"
                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"

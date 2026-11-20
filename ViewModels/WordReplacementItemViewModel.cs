@@ -51,6 +51,9 @@ public partial class WordReplacementItemViewModel : ViewModelBase
         : $"Конфликт с '{ConflictWith}'";
 
     [ObservableProperty]
+    private bool _isException;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CreatedAtText))]
     private DateTime _createdAt;
 
