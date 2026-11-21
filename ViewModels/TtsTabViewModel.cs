@@ -176,9 +176,9 @@ public partial class TtsTabViewModel : ViewModelBase
     private static readonly IBrush SortActiveBorderBrush = Brush.Parse("#1976D2");
     private static readonly IBrush SortActiveForeground = Brush.Parse("#1565C0");
 
-    private static readonly IBrush SortInactiveBackground = Brushes.Transparent;
-    private static readonly IBrush SortInactiveBorderBrush = Brush.Parse("#E0E0E0");
-    private static readonly IBrush SortInactiveForeground = Brush.Parse("#555555");
+    private static readonly IBrush SortInactiveBackground = Brush.Parse("#F2F4F7");
+    private static readonly IBrush SortInactiveBorderBrush = Brush.Parse("#D0D5DD");
+    private static readonly IBrush SortInactiveForeground = Brush.Parse("#475467");
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WordSortIndicator))]

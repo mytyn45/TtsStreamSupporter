@@ -6,5 +6,34 @@
 
     <Application.Styles>
         <FluentTheme />
+
+        <!-- Базовый стиль для кнопок, чтобы они четко выделялись на фоне -->
+        <Style Selector="Button:not(.hyperlink)">
+            <Setter Property="Background" Value="#F2F4F7"/>
+            <Setter Property="BorderBrush" Value="#D0D5DD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Foreground" Value="#344054"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style Selector="Button:not(.hyperlink):pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#E4E7EC"/>
+            <Setter Property="BorderBrush" Value="#98A2B3"/>
+            <Setter Property="Foreground" Value="#1D2939"/>
+        </Style>
+
+        <Style Selector="Button:not(.hyperlink):pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#D0D5DD"/>
+            <Setter Property="BorderBrush" Value="#667085"/>
+            <Setter Property="Foreground" Value="#101828"/>
+        </Style>
+
+        <Style Selector="Button:not(.hyperlink):disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F9FAFB"/>
+            <Setter Property="BorderBrush" Value="#EAECF0"/>
+            <Setter Property="Foreground" Value="#98A2B3"/>
+        </Style>
     </Application.Styles>
 </Application>
