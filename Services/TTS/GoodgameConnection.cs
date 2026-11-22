@@ -149,7 +149,7 @@ public class GoodgameConnection : ConnectionBase
 
         if (string.IsNullOrWhiteSpace(channelToConnect))
         {
-            Log.Error("Не указан ник канала Гудгейма");
+            Log.Error("[GoodGame] Не указан ник канала Гудгейма");
             SetState(ConnectionState.Failed);
             return;
         }
@@ -160,6 +160,7 @@ public class GoodgameConnection : ConnectionBase
         _cts = new CancellationTokenSource();
 
         string channelKey = channelToConnect.Trim();
+        Log.Information("[GoodGame] Запуск подключения к каналу '{Channel}'...", channelKey);
 
         try
         {
@@ -169,25 +170,29 @@ public class GoodgameConnection : ConnectionBase
             if (long.TryParse(channelKey, out _))
             {
                 channelId = channelKey;
+                Log.Information("[GoodGame] Использован прямой числовой channel_id: {ChannelId}", channelId);
             }
             // 2. Проверяем кэш channel_id, чтобы не парсить страницу при каждом подключении
             else if (_channelIdCache.TryGetValue(channelKey, out var cachedId))
             {
                 channelId = cachedId;
+                Log.Information("[GoodGame] Использован кэшированный channel_id: {ChannelId}", channelId);
             }
             else
             {
                 string profile = $"https://goodgame.ru/{Uri.EscapeDataString(channelKey)}";
+                Log.Information("[GoodGame] Запрос страницы {Url} для получения channel_id...", profile);
                 channelId = await GetChannelPreload(profile);
                 if (!string.IsNullOrWhiteSpace(channelId))
                 {
                     _channelIdCache[channelKey] = channelId;
+                    Log.Information("[GoodGame] Получен channel_id: {ChannelId}", channelId);
                 }
             }
 
             if (string.IsNullOrWhiteSpace(channelId))
             {
-                Log.Error("Не удалось получить channel_id для GoodGame {Channel}", channelToConnect);
+                Log.Error("[GoodGame] Не удалось получить channel_id для GoodGame {Channel}", channelToConnect);
                 SetState(ConnectionState.Failed);
                 return;
             }
@@ -196,7 +201,9 @@ public class GoodgameConnection : ConnectionBase
             const string url = "wss://chat.goodgame.ru/chat/websocket";
             var uri = new Uri(url);
 
+            Log.Information("[GoodGame] Подключение к WebSocket {Url}...", url);
             await socket.ConnectAsync(uri, _cts.Token);
+            Log.Information("[GoodGame] WebSocket сокет открыт. Отправка команды join для channel_id {ChannelId}...", channelId);
 
             var message = new
             {
@@ -210,7 +217,7 @@ public class GoodgameConnection : ConnectionBase
             _webSocket = socket;
             _lastMessageReceivedUtc = DateTime.UtcNow;
             SetState(ConnectionState.Connected);
-            Log.Information("Подключение к GoodGame {Channel} (ID: {ChannelId}) завершено.", channelToConnect, channelId);
+            Log.Information("[GoodGame] Подключение к GoodGame {Channel} (ID: {ChannelId}) успешно завершено.", channelToConnect, channelId);
 
             _readTask = Task.Run(() => ReceiveLoopAsync(socket, _cts.Token));
         }
@@ -221,7 +228,7 @@ public class GoodgameConnection : ConnectionBase
         catch (Exception ex)
         {
             SetState(ConnectionState.Failed);
-            Log.Error(ex, "Ошибка при подключении к GoodGame {Channel}", channelToConnect);
+            Log.Error(ex, "[GoodGame] Ошибка при подключении к GoodGame {Channel}", channelToConnect);
             Disconnect();
         }
     }
@@ -275,6 +282,18 @@ public class GoodgameConnection : ConnectionBase
                     // Ответ на наш пинг
                     if (string.Equals(messageType, "pong", StringComparison.OrdinalIgnoreCase))
                     {
+                        continue;
+                    }
+
+                    if (string.Equals(messageType, "welcome", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log.Information("[GoodGame] Сервер прислал welcome (протокол v{Version})", jsonObj["data"]?["protocol_version"]);
+                        continue;
+                    }
+
+                    if (string.Equals(messageType, "success_join", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log.Information("[GoodGame] Вход в чат канала {Channel} подтверждён сервером (success_join).", _channelName);
                         continue;
                     }
 

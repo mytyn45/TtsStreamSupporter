@@ -1,23 +1,185 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:TtsStreamSupporter.ViewModels"
+             xmlns:services="using:TtsStreamSupporter.Services"
              x:Class="TtsStreamSupporter.Views.LogsTab"
              x:DataType="vm:LogsTabViewModel">
 
-    <Grid RowDefinitions="*,Auto" Margin="5">
-        <Border Grid.Row="0" BorderBrush="Black" BorderThickness="1" Margin="5">
-            <ListBox ItemsSource="{Binding ListBoxLogs}"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                     HorizontalAlignment="Stretch"
-                     VerticalAlignment="Stretch"/>
+    <Grid RowDefinitions="Auto,*,Auto" Margin="6" RowSpacing="6">
+
+        <!-- Панель фильтров по сервисам и уровню -->
+        <Border Grid.Row="0"
+                Background="#FAFAFA"
+                BorderBrush="#E0E0E0"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="8,6">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Фильтр:"
+                           FontWeight="SemiBold"
+                           FontSize="12"
+                           Foreground="#475467"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+
+                <!-- Twitch -->
+                <CheckBox IsChecked="{Binding FilterTwitch}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,10,0">
+                    <Border Background="#9146FF" CornerRadius="3" Padding="6,1">
+                        <TextBlock Text="Twitch" Foreground="White" FontWeight="Bold" FontSize="11"/>
+                    </Border>
+                </CheckBox>
+
+                <!-- GoodGame (#233056) -->
+                <CheckBox IsChecked="{Binding FilterGoodGame}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,10,0">
+                    <Border Background="#233056" CornerRadius="3" Padding="6,1">
+                        <TextBlock Text="GoodGame" Foreground="White" FontWeight="Bold" FontSize="11"/>
+                    </Border>
+                </CheckBox>
+
+                <!-- Kick (ярко-зелёный) -->
+                <CheckBox IsChecked="{Binding FilterKick}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,10,0">
+                    <Border Background="#00E701" CornerRadius="3" Padding="6,1">
+                        <TextBlock Text="Kick" Foreground="Black" FontWeight="Bold" FontSize="11"/>
+                    </Border>
+                </CheckBox>
+
+                <!-- Bluestar (половина синий, половина оранжевый) -->
+                <CheckBox IsChecked="{Binding FilterBluestar}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,10,0">
+                    <Border CornerRadius="3" Padding="6,1">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                                <GradientStop Color="#1E88E5" Offset="0.0"/>
+                                <GradientStop Color="#1E88E5" Offset="0.5"/>
+                                <GradientStop Color="#FF8C00" Offset="0.5"/>
+                                <GradientStop Color="#FF8C00" Offset="1.0"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <TextBlock Text="Bluestar" Foreground="White" FontWeight="Bold" FontSize="11"/>
+                    </Border>
+                </CheckBox>
+
+                <!-- Система / Прочее -->
+                <CheckBox IsChecked="{Binding FilterSystem}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,12,0">
+                    <Border Background="#6C757D" CornerRadius="3" Padding="6,1">
+                        <TextBlock Text="Система" Foreground="White" FontWeight="Bold" FontSize="11"/>
+                    </Border>
+                </CheckBox>
+
+                <!-- Только важные / критические -->
+                <CheckBox IsChecked="{Binding FilterOnlyImportant}"
+                          Content="Только важные"
+                          ToolTip.Tip="Показывать только предупреждения и ошибки (желтые и красные)"
+                          FontSize="12"
+                          VerticalAlignment="Center"
+                          Margin="0,0,12,0"/>
+
+                <Button Content="Все"
+                        Command="{Binding ButtonToggleAllFilters}"
+                        ToolTip.Tip="Выбрать все / снять все фильтры"
+                        Padding="8,4"
+                        FontSize="11"
+                        VerticalAlignment="Center"
+                        Margin="0,0,6,0"/>
+
+                <Button Content="Очистить"
+                        Command="{Binding ButtonClearLogs}"
+                        ToolTip.Tip="Очистить список отображаемых логов"
+                        Padding="8,4"
+                        FontSize="11"
+                        VerticalAlignment="Center"
+                        Margin="0,0,10,0"/>
+
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="#888888"
+                           FontSize="11"
+                           VerticalAlignment="Center"/>
+            </WrapPanel>
         </Border>
 
-        <StackPanel Grid.Row="1"
+        <!-- Список отфильтрованных логов -->
+        <Border Grid.Row="1"
+                BorderBrush="#D0D5DD"
+                BorderThickness="1"
+                CornerRadius="6"
+                Background="#FFFFFF"
+                ClipToBounds="True">
+            <ListBox ItemsSource="{Binding FilteredLogs}"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     ScrollViewer.IsScrollInertiaEnabled="True"
+                     HorizontalAlignment="Stretch"
+                     VerticalAlignment="Stretch">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="services:LogEntry">
+                        <Border Background="{Binding RowBackground}"
+                                BorderBrush="{Binding RowBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Margin="0,1"
+                                Padding="6,3">
+                            <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="6">
+                                <!-- Время -->
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding TimeText}"
+                                           Foreground="#757575"
+                                           FontFamily="Consolas,Menlo,Monospace"
+                                           FontSize="11"
+                                           VerticalAlignment="Center"/>
+
+                                <!-- Уровень важности (ИНФО, ВАЖНО = Жёлтый, ОШИБКА = Красный) -->
+                                <Border Grid.Column="1"
+                                        Background="{Binding LevelBadgeBackground}"
+                                        CornerRadius="3"
+                                        Padding="4,1"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding LevelText}"
+                                               Foreground="{Binding LevelBadgeForeground}"
+                                               FontSize="10"
+                                               FontWeight="Bold"/>
+                                </Border>
+
+                                <!-- Бейдж сервиса (Twitch / GoodGame / Kick / Bluestar / Система) -->
+                                <Border Grid.Column="2"
+                                        Background="{Binding ServiceBackground}"
+                                        CornerRadius="3"
+                                        Padding="5,1"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding ServiceName}"
+                                               Foreground="{Binding ServiceForeground}"
+                                               FontSize="10"
+                                               FontWeight="Bold"/>
+                                </Border>
+
+                                <!-- Сообщение -->
+                                <TextBlock Grid.Column="3"
+                                           Text="{Binding Message}"
+                                           Foreground="{Binding TextForeground}"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+
+        <!-- Нижняя панель действий -->
+        <StackPanel Grid.Row="2"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Spacing="8"
-                    Margin="5">
+                    Margin="0,2,0,0">
             <Button Content="Настройки"
                     ToolTip.Tip="Открыть папку с настройками (AppData)"
                     Command="{Binding OpenSettingsFolder}"

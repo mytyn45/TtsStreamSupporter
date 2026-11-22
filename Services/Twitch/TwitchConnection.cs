@@ -86,7 +86,7 @@ public class TwitchConnection : ConnectionBase
     {
         if (string.IsNullOrWhiteSpace(channelName))
         {
-            Log.Warning("Не указан ник канала Twitch для подключения.");
+            Log.Warning("[Twitch] Не указан ник канала Twitch для подключения.");
             SetState(ConnectionState.Failed);
             return;
         }
@@ -98,7 +98,7 @@ public class TwitchConnection : ConnectionBase
 
         if (State == ConnectionState.Connected && _channelName == normalizedChannel)
         {
-            Log.Information("Twitch уже подключён к #{Channel}", _channelName);
+            Log.Information("[Twitch] Канал #{Channel} уже подключён.", _channelName);
             return;
         }
 
@@ -110,18 +110,19 @@ public class TwitchConnection : ConnectionBase
         _cts = new CancellationTokenSource();
 
         SetState(ConnectionState.Connecting);
+        Log.Information("[Twitch] Запуск подключения к каналу #{Channel}...", _channelName);
 
         // Пытаемся подключиться один раз сразу
         bool initialConnected = await TryConnectInternalAsync(_cts.Token);
         if (initialConnected)
         {
             SetState(ConnectionState.Connected);
-            Log.Information("Подключение к Twitch #{Channel} завершено.", _channelName);
+            Log.Information("[Twitch] Подключение к Twitch #{Channel} успешно завершено.", _channelName);
         }
         else
         {
             SetState(ConnectionState.Connecting);
-            Log.Warning("Не удалось сразу подключиться к Twitch #{Channel}. Запуск автоматического переподключения в фоне...", _channelName);
+            Log.Warning("[Twitch] Не удалось сразу подключиться к Twitch #{Channel}. Запуск автоматического переподключения в фоне...", _channelName);
         }
 
         _lifecycleTask = Task.Run(() => ConnectionLifecycleAsync(_cts.Token));
@@ -357,17 +358,21 @@ public class TwitchConnection : ConnectionBase
                 }
                 catch { }
 
+                Log.Information("[Twitch] Попытка TCP соединения с {Host}:{Port}...", TwitchIrcHost, port);
                 await client.ConnectAsync(TwitchIrcHost, port, ct);
+                Log.Information("[Twitch] TCP сокет открыт на порту {Port}. Настройка потоков...", port);
 
                 Stream stream = client.GetStream();
                 if (port == TwitchIrcSslPort)
                 {
+                    Log.Information("[Twitch] Выполнение SSL/TLS рукопожатия с {Host}...", TwitchIrcHost);
                     var sslStream = new SslStream(stream, false);
                     await sslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
                     {
                         TargetHost = TwitchIrcHost
                     }, ct);
                     stream = sslStream;
+                    Log.Information("[Twitch] SSL/TLS шифрование успешно установлено.");
                 }
 
                 var reader = new StreamReader(stream, Encoding.UTF8);
@@ -378,6 +383,7 @@ public class TwitchConnection : ConnectionBase
                 };
 
                 string anonymousNick = $"justinfan{Random.Shared.Next(10000, 99999)}";
+                Log.Information("[Twitch] Авторизация анонимным ником {Nick} и вход в #{Channel}...", anonymousNick, _channelName);
 
                 await _writeLock.WaitAsync(ct);
                 try
@@ -396,7 +402,7 @@ public class TwitchConnection : ConnectionBase
                 _writer = writer;
                 _lastMessageReceivedUtc = DateTime.UtcNow;
 
-                Log.Information("Успешно подключились к IRC Twitch #{Channel} через порт {Port}{Ssl}",
+                Log.Information("[Twitch] Успешно подключились к IRC Twitch #{Channel} через порт {Port}{Ssl}",
                     _channelName, port, port == TwitchIrcSslPort ? " (SSL)" : "");
                 return true;
             }
@@ -407,7 +413,7 @@ public class TwitchConnection : ConnectionBase
             }
             catch (Exception ex)
             {
-                Log.Warning("Не удалось подключиться к Twitch #{Channel} через порт {Port}: {Error}",
+                Log.Warning("[Twitch] Не удалось подключиться к Twitch #{Channel} через порт {Port}: {Error}",
                     _channelName, port, ex.Message);
                 CloseSocketAndStreams();
             }

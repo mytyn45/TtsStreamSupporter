@@ -217,25 +217,25 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
         {
             if (CheckboxConnectToTwitch)
             {
-                Log.Information("Подключение к Twitch...");
+                Log.Information("[Twitch] Инициация подключения...");
                 await _twitchConnection.ConnectAsync(TwitchNick);
             }
 
             if (CheckboxConnectToGoodgame)
             {
-                Log.Information("Подключение к GoodGame...");
+                Log.Information("[GoodGame] Инициация подключения...");
                 await _goodgameConnection.ConnectAsync(GoodgameNick);
             }
 
             if (CheckboxConnectToKick)
             {
-                Log.Information("Подключение к Kick...");
+                Log.Information("[Kick] Инициация подключения...");
                 await _kickConnection.ConnectAsync(KickNick);
             }
 
             if (CheckboxConnectToBluestar)
             {
-                Log.Information("Подключение к Bluestar...");
+                Log.Information("[Bluestar] Инициация подключения...");
                 await _bluestarConnection.ConnectAsync(BluestarApi);
             }
         }
@@ -264,7 +264,7 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
 
             if (CheckboxConnectToTwitch)
             {
-                Log.Information("Переподключение к Twitch...");
+                Log.Information("[Twitch] Инициация переподключения...");
                 await _twitchConnection.ReconnectAsync(TwitchNick);
             }
             else
@@ -274,7 +274,7 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
 
             if (CheckboxConnectToGoodgame)
             {
-                Log.Information("Переподключение к GoodGame...");
+                Log.Information("[GoodGame] Инициация переподключения...");
                 await _goodgameConnection.ReconnectAsync(GoodgameNick);
             }
             else
@@ -284,7 +284,7 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
 
             if (CheckboxConnectToKick)
             {
-                Log.Information("Переподключение к Kick...");
+                Log.Information("[Kick] Инициация переподключения...");
                 await _kickConnection.ReconnectAsync(KickNick);
             }
             else
@@ -294,7 +294,7 @@ public partial class ConnectionsTabViewModel : ViewModelBase, IDisposable
 
             if (CheckboxConnectToBluestar)
             {
-                Log.Information("Переподключение к Bluestar...");
+                Log.Information("[Bluestar] Инициация переподключения...");
                 await _bluestarConnection.ReconnectAsync(BluestarApi);
             }
             else

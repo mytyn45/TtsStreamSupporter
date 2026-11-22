@@ -115,7 +115,7 @@ public class BluestarConnection : ConnectionBase
 
         if (string.IsNullOrWhiteSpace(token))
         {
-            Log.Error("Не указан токен Bluestar");
+            Log.Error("[Bluestar] Не указан токен Bluestar");
             SetState(ConnectionState.Failed);
             return;
         }
@@ -127,6 +127,7 @@ public class BluestarConnection : ConnectionBase
         _reconnectDelayMs = 1000;
 
         SetState(ConnectionState.Connecting);
+        Log.Information("[Bluestar] Запуск подключения к сервису Bluestar TTS...");
 
         try
         {
@@ -141,7 +142,7 @@ public class BluestarConnection : ConnectionBase
         catch (Exception ex)
         {
             SetState(ConnectionState.Connecting);
-            Log.Warning("Не удалось сразу подключиться к Bluestar. Запуск фонового цикла переподключения: {Error}", ex.Message);
+            Log.Warning("[Bluestar] Не удалось сразу подключиться к Bluestar. Запуск фонового цикла переподключения: {Error}", ex.Message);
         }
 
         _lifecycleTask = Task.Run(() => ConnectLoopAsync(_cts.Token));
@@ -201,14 +202,15 @@ public class BluestarConnection : ConnectionBase
 
         var uri = new Uri($"wss://twitch.catgc.com/api/v1/tts/ws?token={_token}");
 
-        Log.Information("Bluestar: подключение...");
+        string mask = string.IsNullOrWhiteSpace(_token) ? "" : (_token.Length > 4 ? _token[..4] + "***" : "***");
+        Log.Information("[Bluestar] Подключение к WebSocket wss://twitch.catgc.com/... (токен: {Mask})", mask);
 
         await _socket.ConnectAsync(uri, ct);
 
         _lastMessageReceivedUtc = DateTime.UtcNow;
         SetState(ConnectionState.Connected);
 
-        Log.Information("Bluestar: подключено");
+        Log.Information("[Bluestar] WebSocket соединение установлено. Ожидание события tts.ready...");
     }
 
     private async Task ReceiveLoopAsync(CancellationToken ct)
@@ -256,7 +258,7 @@ public class BluestarConnection : ConnectionBase
             switch (message.Type)
             {
                 case "tts.ready":
-                    Log.Information("Bluestar: подключено к каналу {Channel}", message.Channel);
+                    Log.Information("[Bluestar] Сервис готов! Подключено к каналу {Channel}", message.Channel);
                     break;
 
                 case "tts.message":
@@ -273,7 +275,7 @@ public class BluestarConnection : ConnectionBase
 
                 case "error":
                     Log.Error(
-                        "Bluestar API error: {Code} | {Message}",
+                        "[Bluestar] Ошибка API Bluestar: {Code} | {Message}",
                         message.ErrorCode,
                         message.ErrorMessage);
                     break;

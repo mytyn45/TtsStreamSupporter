@@ -16,7 +16,15 @@ public class SerilogSink : ILogEventSink
     {
         var message = logEvent.RenderMessage();
 
-        _logService.Add(
-            $"[{logEvent.Timestamp:HH:mm:ss}] [{logEvent.Level}] {message}");
+        var entry = new LogEntry
+        {
+            Timestamp = logEvent.Timestamp.LocalDateTime,
+            Level = logEvent.Level,
+            Message = message,
+            Exception = logEvent.Exception,
+            Service = LogEntry.DetectService(message, logEvent)
+        };
+
+        _logService.Add(entry);
     }
 }

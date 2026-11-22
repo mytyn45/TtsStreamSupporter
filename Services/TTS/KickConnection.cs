@@ -155,7 +155,7 @@ public class KickConnection : ConnectionBase
 
         if (string.IsNullOrWhiteSpace(channelToConnect))
         {
-            Log.Error("Не указан ник канала Kick");
+            Log.Error("[Kick] Не указан ник канала Kick");
             SetState(ConnectionState.Failed);
             return;
         }
@@ -166,26 +166,32 @@ public class KickConnection : ConnectionBase
         string slug = CleanSlug(channelToConnect);
         _channelName = slug;
         _cts = new CancellationTokenSource();
+        Log.Information("[Kick] Запуск подключения к каналу '{Channel}' (slug: {Slug})...", channelToConnect, slug);
 
         try
         {
+            Log.Information("[Kick] Запрос информации о канале {Slug}...", slug);
             var channelInfo = await GetChannelInfoAsync(slug, _cts.Token);
             if (channelInfo == null)
             {
-                Log.Error("Не удалось получить информацию о канале Kick {Channel}", slug);
+                Log.Error("[Kick] Не удалось получить информацию о канале Kick {Channel}", slug);
                 SetState(ConnectionState.Failed);
                 return;
             }
 
             var (channelId, chatroomId) = channelInfo.Value;
+            Log.Information("[Kick] Метаданные получены: Channel ID = {ChannelId}, Chatroom ID = {ChatroomId}", channelId, chatroomId);
 
             var (appKey, cluster) = await GetPusherCredentialsAsync(channelId, _cts.Token);
+            Log.Information("[Kick] Параметры Pusher: Cluster={Cluster}, AppKey={AppKey}", cluster, appKey);
 
             string wsUrl = $"wss://ws-{cluster}.pusher.com/app/{appKey}?protocol=7&client=js&version=7.4.0&flash=false";
             var uri = new Uri(wsUrl);
 
             var socket = new ClientWebSocket();
+            Log.Information("[Kick] Подключение к WebSocket {Url}...", wsUrl);
             await socket.ConnectAsync(uri, _cts.Token);
+            Log.Information("[Kick] WebSocket открыт. Отправка подписки на chatrooms.{ChatroomId}.v2...", chatroomId);
 
             // Подписываемся на события чата chatrooms.{chatroomId}.v2
             string subMessage = $"{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"chatrooms.{chatroomId}.v2\"}}}}";
@@ -194,6 +200,7 @@ public class KickConnection : ConnectionBase
             // Если channel_id отличается от chatroom_id, подписываемся также на channel_id
             if (!string.Equals(channelId, chatroomId, StringComparison.OrdinalIgnoreCase))
             {
+                Log.Information("[Kick] Дополнительная подписка на chatrooms.{ChannelId}.v2...", channelId);
                 string subChannelMessage = $"{{\"event\":\"pusher:subscribe\",\"data\":{{\"auth\":\"\",\"channel\":\"chatrooms.{channelId}.v2\"}}}}";
                 await SendWebSocketTextAsync(socket, subChannelMessage, _cts.Token);
             }
@@ -201,7 +208,7 @@ public class KickConnection : ConnectionBase
             _webSocket = socket;
             _lastMessageReceivedUtc = DateTime.UtcNow;
             SetState(ConnectionState.Connected);
-            Log.Information("Подключение к Kick {Channel} (ID: {ChannelId}, Chatroom: {ChatroomId}) успешно завершено.", slug, channelId, chatroomId);
+            Log.Information("[Kick] Подключение к Kick {Channel} (ID: {ChannelId}, Chatroom: {ChatroomId}) успешно завершено.", slug, channelId, chatroomId);
 
             _readTask = Task.Run(() => ReceiveLoopAsync(socket, slug, _cts.Token));
             _heartbeatTask = Task.Run(() => HeartbeatLoopAsync(socket, _cts.Token));
@@ -213,7 +220,7 @@ public class KickConnection : ConnectionBase
         catch (Exception ex)
         {
             SetState(ConnectionState.Failed);
-            Log.Error(ex, "Ошибка при подключении к Kick {Channel}", slug);
+            Log.Error(ex, "[Kick] Ошибка при подключении к Kick {Channel}", slug);
             Disconnect();
         }
     }
@@ -402,6 +409,30 @@ public class KickConnection : ConnectionBase
         // Ответ Pusher на наш ping
         if (string.Equals(eventName, "pusher:pong", StringComparison.OrdinalIgnoreCase))
         {
+            return;
+        }
+
+        if (string.Equals(eventName, "pusher:connection_established", StringComparison.OrdinalIgnoreCase))
+        {
+            string? socketId = null;
+            try
+            {
+                var dataToken = jsonObj["data"];
+                if (dataToken?.Type == JTokenType.String)
+                {
+                    var dataObj = JObject.Parse(dataToken.ToString());
+                    socketId = dataObj["socket_id"]?.ToString();
+                }
+            }
+            catch { }
+            Log.Information("[Kick] Соединение с сервером Pusher подтверждено (Socket ID: {SocketId}).", socketId ?? "ok");
+            return;
+        }
+
+        if (string.Equals(eventName, "pusher_internal:subscription_succeeded", StringComparison.OrdinalIgnoreCase))
+        {
+            string? channel = jsonObj["channel"]?.ToString();
+            Log.Information("[Kick] Подписка на канал {Channel} подтверждена сервером Kick.", channel ?? "chatrooms");
             return;
         }
 
